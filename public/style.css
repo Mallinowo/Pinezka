@@ -395,3 +395,5 @@ body.w-menu .szukaj,body.w-menu .zoom{display:none}
 .menu-stopka a,.menu-stopka button{color:var(--tusz2);background:none;border:0;padding:0;font-size:10px;text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-family:var(--mono)}
 .menu-stopka a:hover,.menu-stopka button:hover{color:var(--czerw)}
 .menu-stopka span{color:var(--szary)}
+.wykres{height:156px;padding-top:24px;box-sizing:border-box}
+.wykres .kol em{top:-19px}
