@@ -22,6 +22,7 @@
 - Każda odpowiedź ma poziom rzadkości: **Oczywisty 40 · Znany 55 · Rzadki 70 · Egzotyczny 85 · Biały kruk 100** mil.
 - Mile przesuwają samolot po trasie lotu, a nowe kraje dają pieczątki w paszporcie.
 - Na koniec widać tablicę przylotów, wszystkie poprawne odpowiedzi na mapie i to, jak często wybierali je inni gracze.
+- **Ślepa mapa:** można wyłączyć nazwy państw, wtedy każda trafna odpowiedź daje +25% mil.
 - Archiwum poprzednich lotów, statystyki, seria dni, udostępnianie wyniku.
 
 ## Technicznie

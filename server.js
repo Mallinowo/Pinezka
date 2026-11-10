@@ -4,7 +4,7 @@ const PYT = require('./shared/pytania.js');
 const PORT = process.env.PORT || 3000;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 const PUB = path.join(__dirname, 'public');
-const START = '2026-11-09', NA_DZIEN = 7, PKT = [0, 40, 55, 70, 85, 100];
+const START = '2026-11-09', NA_DZIEN = 7, PKT = [0, 40, 55, 70, 85, 100], SLEPA = 1.25; // ślepa mapa: +25% mil
 fs.mkdirSync(DATA, { recursive: true });
 
 // mapa: kotwice krajów (do radaru)
@@ -110,7 +110,7 @@ http.createServer(async (req, res) => {
       if (!nr || !(i >= 0 && i < NA_DZIEN) || !KOTWICA[kraj]) return json(res, 400, { blad: 'Złe dane' });
       const P = pytania[pytaniaDnia(nr)[i]], poz = P.o[kraj] || 0;
       if (raz(req, 'o' + nr + ':' + i)) { const w = dzienSt(nr).wybory, k = w[i] || (w[i] = {}); k[kraj] = (k[kraj] || 0) + 1; brudne = true; }
-      return json(res, 200, { poziom: poz, pkt: PKT[poz], fakt: poz ? (P.f[kraj] || P.f['*'] || '') : '' });
+      return json(res, 200, { poziom: poz, pkt: Math.round(PKT[poz] * (b.slepa ? SLEPA : 1)), fakt: poz ? (P.f[kraj] || P.f['*'] || '') : '' });
     }
     if (p === '/api/wyniki') {
       const nr = nrOk(u.searchParams.get('nr'));
@@ -128,7 +128,7 @@ http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     if (p === '/api/koniec' && req.method === 'POST') {
-      const b = await body(req), nr = nrOk(b.nr), pkt = Math.max(0, Math.min(700, +b.pkt || 0));
+      const b = await body(req), nr = nrOk(b.nr), pkt = Math.max(0, Math.min(Math.round(NA_DZIEN * 100 * SLEPA), +b.pkt || 0));
       if (!nr) return json(res, 400, { blad: 'Złe dane' });
       const W = dzienSt(nr).wyniki; if (raz(req, 'k' + nr)) { W.push(pkt); brudne = true; }
       const gorsi = W.filter(x => x < pkt).length;

@@ -188,7 +188,7 @@ function rysuj(szybko) {
 }
 function zaokr(x, y, w, h, r) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); }
 function podpisy() {
-  if (V.k < kFit() * 1.6) return;
+  if (V.k < kFit() * 1.6 || slepa()) return;
   ctx.font = '500 10px "IBM Plex Mono"'; ctx.letterSpacing = '1.5px'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   for (const g of geo) {
     if (g.ukryty) continue; const k = PO_KODZIE[g.c]; if (k.t) continue;
@@ -327,14 +327,14 @@ function trafienie(x, y) {
 function najedz(x, y) {
   const c = trafienie(x, y), d = $('#dymek');
   if (c !== najechany) { najechany = c; odswiez(); }
-  if (c) { const k = PO_KODZIE[c]; d.hidden = false; d.textContent = k.n + (k.t ? ' · terytorium' : ''); d.style.left = x + 'px'; d.style.top = y + 'px'; }
+  if (c && !slepa()) { const k = PO_KODZIE[c]; d.hidden = false; d.textContent = k.n + (k.t ? ' · terytorium' : ''); d.style.left = x + 'px'; d.style.top = y + 'px'; }
   else d.hidden = true;
 }
 function klik(x, y) {
   const c = trafienie(x, y);
   if (tryb === 'koniec') { if (podglad && c) pokazKrajWPodgladzie(c); return; }
   if (tryb !== 'pytanie' || !c) return;
-  if (PO_KODZIE[c].t) { podpowiedz(PO_KODZIE[c].n + ' to terytorium zależne, a nie państwo.'); return; }
+  if (PO_KODZIE[c].t) { podpowiedz((slepa() ? 'To' : PO_KODZIE[c].n) + ' to terytorium zależne, a nie państwo.'); return; }
   const g = geo.find(g => g.c === c), [px, py] = naProj(x, y);
   wybierz(c, g && g.maly && (g.bb[2] - g.bb[0]) * V.k <= 14 ? null : { lon: px / RAD, lat: odwrocY(py) });
 }
@@ -344,6 +344,7 @@ function podpowiedz(t) { const e = $('#wskaz'); if (!e) return; e.innerHTML = `<
 
 $('#krajeLista').innerHTML = PANSTWA.slice().sort((a, b) => a.n.localeCompare(b.n, 'pl')).map(k => `<option value="${esc(k.n)}">`).join('');
 $('#szukaj').addEventListener('change', e => {
+  if (slepa()) { e.target.value = ''; return; }
   const k = PANSTWA.find(k => k.n.toLowerCase() === e.target.value.trim().toLowerCase()); if (!k) return;
   const g = geo.find(g => g.c === k.c), roz = g ? Math.max(g.bb[2] - g.bb[0], g.bb[3] - g.bb[1]) : .1;
   plynnie(() => wysrodkuj(k.a[0], k.a[1], Math.max(V.k, Math.min(cw, ch) / Math.max(roz * 3, .35))));
@@ -387,6 +388,8 @@ async function api(url, dane) {
 const klucz = nr => 'pz-lot-' + nr;
 const nowyStan = () => ({ odp: [], i: 0, paliwo: 1, radar: [], koniec: false, druga: false, drugaAktywna: -1 });
 const suma = () => stan.odp.reduce((s, o) => s + o.pkt, 0);
+// ślepa mapa: w trakcie pytania bez nazw, bez wyszukiwarki i bez dymków; +25% mil
+const slepa = () => !!(stan && stan.slepa && (tryb === 'pytanie' || tryb === 'odslona'));
 const zapisz = () => store.set(klucz(dzien.nr), stan);
 const nrLotu = () => 'PZ ' + String(dzien.nr).padStart(3, '0');
 function animujMile(od, doo) {
@@ -415,7 +418,7 @@ let kDnia = null, menuInt = null;
 const dataNr = nr => new Date(Date.parse(dzis.data) - (dzis.nr - nr) * 864e5).toISOString().slice(0, 10);
 function kolorySt(st) { return st && st.odp ? st.odp.map(o => `<i style="background:${KOL[o.poziom]}"></i>`).join('') : ''; }
 function pokazMenu() {
-  tryb = 'menu'; podglad = null; wybrany = null; pin = null; stan = null; $('#wynikMapa').hidden = true; stopZegar(true);
+  tryb = 'menu'; document.body.classList.remove('w-slepa'); podglad = null; wybrany = null; pin = null; stan = null; $('#wynikMapa').hidden = true; stopZegar(true);
   document.body.classList.add('w-menu'); rozmiar(); dopasuj();
   if (kDnia === null) kDnia = Date.now() + dzis.doNastepnego;
   const w = wynikLotu(dzis.nr), s = store.get('pz-seria', { n: 0, ost: 0 }), seria = s.ost >= dzis.nr - 1 ? s.n : 0, wTrakcie = store.get(klucz(dzis.nr), null);
@@ -437,6 +440,7 @@ function pokazMenu() {
       <div class="menu-pod">codzienny lot dookoła świata</div>
       <div class="tablo"><div><small>ODLOT</small><b>00:00</b></div><div><small>BRAMKA</small><b>${N}</b></div><div><small>KLASA</small><b>PZ</b></div><div class="st"><small>STATUS</small><b id="tabloSt" data-t="${status}">${status}</b></div></div>
       <button class="btn glowny duzy" id="mGraj"><span>${w === null ? (wTrakcie ? 'Kontynuuj lot' : 'Wejdź na pokład') : 'Twój wynik · ' + w + ' mil'}</span> <span class="lec">✈</span></button>
+      ${(() => { const st = wTrakcie, zab = !!st, on = st ? !!st.slepa : !!ust.slepa; return `<label class="slepa-tog${zab ? ' zab' : ''}" title="${zab ? 'Tryb ustawia się na początku lotu' : ''}"><input type="checkbox" id="mSlepa" ${on ? 'checked' : ''} ${zab ? 'disabled' : ''}><span class="sw"></span><span class="tx">🙈 Ślepa mapa: bez nazw państw <b>+25% mil</b>${zab ? '<small>ustawione dla dzisiejszego lotu</small>' : ''}</span></label>`; })()}
       <div class="menu-sieg">${N} pytań · ${CZAS} s na każde · im rzadsza odpowiedź, tym dalej</div>
     </div>
     <div class="menu-odcinek">
@@ -452,6 +456,7 @@ function pokazMenu() {
   </div>`;
   $('#menu').querySelector('.menu-karta').insertAdjacentHTML('beforeend', `<div class="menu-stopka"><button id="mBlad">Zgłoś błąd</button><a href="https://szyb.app" target="_blank" rel="noopener">Zagraj też w Szyb ⛏</a><a href="/regulamin">Regulamin</a><a href="/prywatnosc">Prywatność</a><span>Granice: Natural Earth</span></div>`);
   $('#mBlad').onclick = () => zglosForm({ typ: 'blad', gdzie: 'menu' });
+  $('#mSlepa').onchange = e => { ust.slepa = e.target.checked; store.set('pz-ust', ust); dzwiek('wyb'); };
   $('#mGraj').onclick = () => wejdz(dzis.nr); $('#mArch').onclick = archiwum; $('#mPasz').onclick = paszport; $('#mStat').onclick = statystyki; $('#mJak').onclick = jakGrac;
   $('#menu').hidden = false;
   clearInterval(menuInt);
@@ -475,6 +480,7 @@ async function wejdz(nr) {
   document.body.classList.remove('w-menu'); $('#menu').hidden = true; rozmiar(); dopasuj();
   $('#lotInfo').textContent = `LOT ${nrLotu()} · ` + dataPL(dzien.data) + (nr !== dzis.nr ? ' · ARCHIWUM' : '');
   stan = Object.assign(nowyStan(), store.get(klucz(dzien.nr), {}));
+  if (stan.slepa === undefined) stan.slepa = !stan.odp.length && !stan.czas && !stan.koniec ? !!ust.slepa : false;
   $('#mile').textContent = suma();
   if (stan.koniec) return pokazKoniec();
   tryb = stan.i < stan.odp.length ? 'wynik' : 'pytanie';
@@ -566,7 +572,7 @@ function rysujSzlak(od) {
   ustaw(od); requestAnimationFrame(krok);
 }
 function rysujPanel(odMil) {
-  const pn = $('#panel'); kartaMapy();
+  const pn = $('#panel'); kartaMapy(); document.body.classList.toggle('w-slepa', slepa());
   if (tryb === 'start') {
     pn.innerHTML = `<div class="bp">${kartaGora('LOT <b>' + nrLotu() + '</b>')}${trasaKarty(null)}<div class="perf"></div>
       <div class="start"><h2>Dzisiejszy lot</h2><p>${N} pytań, ${N} pinezek. Wbij pinezkę w kraj, który pasuje do pytania. Im rzadsza trafna odpowiedź, tym dalej polecisz.</p>
@@ -580,7 +586,7 @@ function rysujPanel(odMil) {
       <div class="bp-pyt"><small>PYTANIE ${stan.i + 1} Z ${N}</small><p>${esc(q.q)}</p>${q.u ? `<em>${esc(q.u)}</em>` : ''}</div>
       <div class="perf"></div>
       <div class="zegar" id="zegar"><span class="zs">⏱ <b id="zegarS">${CZAS}</b> s</span><span class="zp"><i id="zegarP"></i></span></div>
-      <div class="wskaz" id="wskaz">${k ? 'Pinezka: <b>' + esc(k.n) + '</b>' : 'Kliknij na mapie, żeby wbić pinezkę.'}</div>
+      <div class="wskaz" id="wskaz">${k ? (stan.slepa ? 'Pinezka wbita ✓ <b>(ślepa mapa: nazwę zobaczysz po lądowaniu)</b>' : 'Pinezka: <b>' + esc(k.n) + '</b>') : stan.slepa ? '🙈 Ślepa mapa: bez nazw państw, +25% mil.' : 'Kliknij na mapie, żeby wbić pinezkę.'}</div>
       <div class="akcje"><button class="btn glowny${k ? ' gotowy' : ''}" id="bLaduj" ${k && tryb === 'pytanie' ? '' : 'disabled'}>Wbij pinezkę</button></div></div>${szlak()}`;
     $('#bLaduj').onclick = laduj;
     if (tryb === 'pytanie') startZegar(); else stopZegar(true);
@@ -658,7 +664,7 @@ let wysyla = false;
 async function laduj(poCzasie) {
   if (!wybrany || wysyla || tryb !== 'pytanie') return;
   wysyla = true; stopZegar(); const k = PO_KODZIE[wybrany];
-  let r; try { r = await api('/api/odp', { nr: dzien.nr, i: stan.i, kraj: k.c }); } catch { wysyla = false; if (poCzasie === true) { wybrany = null; return koniecCzasu(); } startZegar(); podpowiedz('Brak połączenia – spróbuj jeszcze raz.'); return; }
+  let r; try { r = await api('/api/odp', { nr: dzien.nr, i: stan.i, kraj: k.c, slepa: !!stan.slepa }); } catch { wysyla = false; if (poCzasie === true) { wybrany = null; return koniecCzasu(); } startZegar(); podpowiedz('Brak połączenia – spróbuj jeszcze raz.'); return; }
   wysyla = false;
   const o = { kraj: k.c, poziom: r.poziom, pkt: r.pkt, fakt: r.fakt, pin };
   const przed = suma(); stan.odp.push(o); pin = null;
@@ -685,11 +691,11 @@ async function zakoncz() {
 
 let aktywne = -1;
 async function pokazKoniec() {
-  tryb = 'koniec'; radar = null; wybrany = null; koniecT0 = performance.now() + 300; $('#wynikMapa').hidden = true;
+  tryb = 'koniec'; document.body.classList.remove('w-slepa'); radar = null; wybrany = null; koniecT0 = performance.now() + 300; $('#wynikMapa').hidden = true;
   try { wyniki = await api('/api/wyniki?nr=' + dzien.nr); } catch { wyniki = null; }
   dopasuj();
   const s = store.get('pz-seria', { n: 1 }), pasz = Object.keys(store.get('pz-paszport', {})).length, rk = stan.ranking;
-  $('#panel').innerHTML = `<div class="tablica"><div class="nag"><span>PRZYLOTY · ${nrLotu()}</span><span>${new Date(dzien.data + 'T12:00:00').toLocaleDateString('pl-PL')}</span></div>
+  $('#panel').innerHTML = `<div class="tablica"><div class="nag"><span>PRZYLOTY · ${nrLotu()}${stan.slepa ? ' · 🙈 ŚLEPA MAPA' : ''}</span><span>${new Date(dzien.data + 'T12:00:00').toLocaleDateString('pl-PL')}</span></div>
     ${stan.odp.map((o, i) => `<div class="wiersz" style="--d:${i}"><span>${i + 1}</span><span class="kr"><span class="fl">${o.kraj ? esc(PO_KODZIE[o.kraj].a3) : '⏱'}</span> ${esc(nazwa(o.kraj))}</span><span class="st k${o.poziom}">${o.kraj ? POZ[o.poziom].toUpperCase() : 'CZAS!'}</span><span class="mi">${o.pkt}</span></div>`).join('')}
     <div class="suma"><span class="kolory">${stan.odp.map(o => `<i style="background:${KOL[o.poziom]}"></i>`).join('')}</span><span><b>${suma()}</b> mil</span></div></div>
     <div class="sekcja">${rk && rk.graczy > 1 ? `<div class="uw" style="text-align:center;margin-bottom:10px">Lepiej niż <b>${rk.lepszyNiz}%</b> z ${rk.graczy} pilotów dzisiaj</div>` : ''}
@@ -737,7 +743,7 @@ function odliczaj() {
   t();
 }
 async function udostepnij() {
-  const txt = `Pinezka ${nrLotu()} ✈ ${suma()} mil\n${stan.odp.map(o => EMOJI[o.poziom]).join('')}\n${location.origin}`;
+  const txt = `Pinezka ${nrLotu()} ✈ ${suma()} mil${stan.slepa ? ' · 🙈 ślepa mapa' : ''}\n${stan.odp.map(o => EMOJI[o.poziom]).join('')}\n${location.origin}`;
   try { if (navigator.share && matchMedia('(pointer:coarse)').matches) { await navigator.share({ text: txt }); return; } } catch {}
   try { await navigator.clipboard.writeText(txt); $('#bUdostepnij').textContent = 'Skopiowano ✓'; setTimeout(() => { const b = $('#bUdostepnij'); if (b) b.textContent = 'Udostępnij wynik'; }, 2000); }
   catch { prompt('Skopiuj wynik:', txt); }
@@ -756,7 +762,7 @@ function jakGrac() {
     krok(3, 'Leć dalej za rzadkie odpowiedzi', 'Im mniej oczywisty kraj, tym więcej mil:') +
     `<div class="poz-lista">${[1, 2, 3, 4, 5].map(p => `<div style="--i:${p}"><span class="znacz z${p}">${POZ[p]}</span><b>+${PKT[p]}</b></div>`).join('')}</div>` +
     krok(4, 'Zbieraj pieczątki', 'Mile przesuwają samolot po trasie lotu. Za każdy trafiony nowy kraj dostajesz pieczątkę w paszporcie. Na koniec zobaczysz wszystkie poprawne odpowiedzi i ciekawostki.') +
-    `<p class="ok-mini">Mapę przesuwasz myszką lub palcem i przybliżasz kółkiem, szczypaniem, dwuklikiem albo przyciskami. Małe państwa mają kółka.</p>`);
+    `<p class="ok-mini">🙈 <b>Ślepa mapa</b> (przełącznik w menu): na mapie nie ma nazw państw, wyszukiwarki ani podpowiedzi, ale każda trafna odpowiedź daje <b>25% mil więcej</b>. Tryb wybierasz przed startem lotu.</p><p class="ok-mini">Mapę przesuwasz myszką lub palcem i przybliżasz kółkiem, szczypaniem, dwuklikiem albo przyciskami. Małe państwa mają kółka.</p>`);
 }
 $('#bJak').onclick = jakGrac;
 document.querySelector('.logo').onclick = () => { if (tryb !== 'odslona') pokazMenu(); };
