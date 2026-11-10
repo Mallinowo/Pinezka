@@ -450,7 +450,7 @@ function pokazMenu() {
       <button id="mArch" style="--i:0">${IK.arch}<span>Archiwum</span></button><button id="mPasz" style="--i:1">${IK.pasz}<span>Paszport</span></button><button id="mStat" style="--i:2">${IK.stat}<span>Statystyki</span></button><button id="mJak" style="--i:3">${IK.jak}<span>Jak grać</span></button>
     </div>
   </div>`;
-  $('#menu').querySelector('.menu-karta').insertAdjacentHTML('beforeend', `<div class="menu-stopka"><button id="mBlad">Zgłoś błąd</button><a href="/regulamin">Regulamin</a><a href="/prywatnosc">Prywatność</a><span>Granice: Natural Earth</span></div>`);
+  $('#menu').querySelector('.menu-karta').insertAdjacentHTML('beforeend', `<div class="menu-stopka"><button id="mBlad">Zgłoś błąd</button><a href="https://szyb.app" target="_blank" rel="noopener">Zagraj też w Szyb ⛏</a><a href="/regulamin">Regulamin</a><a href="/prywatnosc">Prywatność</a><span>Granice: Natural Earth</span></div>`);
   $('#mBlad').onclick = () => zglosForm({ typ: 'blad', gdzie: 'menu' });
   $('#mGraj').onclick = () => wejdz(dzis.nr); $('#mArch').onclick = archiwum; $('#mPasz').onclick = paszport; $('#mStat').onclick = statystyki; $('#mJak').onclick = jakGrac;
   $('#menu').hidden = false;
@@ -601,6 +601,10 @@ function rysujPanel(odMil) {
     return rysujSzlak(odMil);
   }
 }
+const kartaSzyb = () => `<a class="szyb-karta" href="https://szyb.app" target="_blank" rel="noopener">
+  <span class="szyb-ik"><svg viewBox="0 0 24 24"><path d="M14 4c3 0 6 1.5 7 3-2.5-.6-5-.6-7 0M14 4c-3 0-6 1.5-7 3 2.5-.6 5-.6 7 0M14 4v3M13 7 4 20"/></svg></span>
+  <span class="szyb-tx"><small>INNA GRA AUTORA</small><b>Szyb ⛏</b><span>Codzienna gra słowna. Podaj jak najrzadszą odpowiedź w kategorii i dokop się jak najgłębiej.</span></span>
+  <span class="szyb-go">szyb.app ›</span></a>`;
 const stopka = () => '<div class="stopka">Granice państw: Natural Earth. Nowy lot codziennie o północy.</div>';
 // formularz zgłoszeń: błąd w grze/pytaniu albo brakujący kraj
 function zglosForm(o) {
@@ -693,7 +697,7 @@ async function pokazKoniec() {
     <div class="statyst"><div><b>${s.n}</b>dni z rzędu</div><div><b>${pasz}</b>pieczątek</div><div><b id="odliczanie">–</b>do lotu ${dzis.nr + 1}</div></div></div>
     <div class="sekcja"><h4>ODPOWIEDZI · KLIKNIJ, ŻEBY ZOBACZYĆ NA MAPIE</h4>${stan.odp.map((o, i) => `<div class="odp" data-i="${i}"><div class="q">${i + 1}. ${esc(dzien.pytania[i].q)}</div>
       <span class="znacz z${o.poziom}">${POZ[o.poziom]}</span> ${esc(nazwa(o.kraj))} <b>+${o.pkt}</b><br>
-      <button data-i="${i}">Pokaż wszystkie odpowiedzi ›</button><div class="lista-poz"></div></div>`).join('')}</div>${stopka()}`;
+      <button data-i="${i}">Pokaż wszystkie odpowiedzi ›</button><div class="lista-poz"></div></div>`).join('')}</div>${kartaSzyb()}${stopka()}`;
   $('#bUdostepnij').onclick = udostepnij; $('#bMenu').onclick = pokazMenu;
   $('#panel').querySelectorAll('.odp>button').forEach(b => b.onclick = () => pokazOdpowiedzi(+b.dataset.i));
   odliczaj(); odswiez();
