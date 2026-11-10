@@ -1,0 +1,9 @@
+{
+  "name": "pinezka",
+  "version": "0.1.0",
+  "description": "Pinezka – dzienna gra geograficzna: wskaż kraj na mapie, rzadsza odpowiedź daje więcej mil.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "license": "UNLICENSED"
+}

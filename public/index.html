@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Pinezka – codzienny lot dookoła świata</title>
+<meta name="description" content="Codziennie 7 pytań. Wskaż kraj na mapie – im rzadsza poprawna odpowiedź, tym dalej polecisz.">
+<meta name="theme-color" content="#4a2f1b">
+<link rel="canonical" href="https://pinezka.fun/">
+<meta property="og:title" content="Pinezka – codzienny lot dookoła świata">
+<meta property="og:description" content="Codziennie 7 pytań. Wbij pinezkę w kraj na mapie – im rzadsza poprawna odpowiedź, tym dalej polecisz.">
+<meta property="og:image" content="https://pinezka.fun/og.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image">
+<meta property="og:url" content="https://pinezka.fun/"><meta property="og:type" content="website"><meta property="og:locale" content="pl_PL">
+<link rel="icon" href="/favicon.ico" sizes="48x48">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="manifest" href="/site.webmanifest">
+<link rel="stylesheet" href="/fonts.css">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body class="w-menu">
+<header class="top">
+  <div class="logo" title="Menu"><svg viewBox="0 0 24 24" width="22" height="22"><path d="M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7z" fill="#b03a2e"/><circle cx="12" cy="9" r="2.6" fill="#efe2c2"/></svg>PINEZKA</div>
+  <div class="lot" id="lotInfo"></div>
+  <div class="mile"><span>mile</span><b id="mile">0</b></div>
+  <nav>
+    <button id="bPaszport">Paszport</button>
+    <button id="bJak" title="Jak grać" class="ikona">?</button>
+    <button id="bDzwiek" title="Dźwięk" class="ikona">♪</button>
+  </nav>
+</header>
+<main>
+  <section id="mapa">
+    <canvas id="cv"></canvas>
+    <div class="chmury" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="winieta"></div>
+    <svg class="kompas" viewBox="-50 -50 100 100" aria-hidden="true"><circle r="44" fill="#efe2c2dd" stroke="#5a4428" stroke-width="1.5"/><circle r="38" fill="none" stroke="#5a442899" stroke-dasharray="1 3" stroke-width="3"/><path d="M0-42 L6 0 L0 42 L-6 0Z" fill="#3b2a1a"/><path d="M0-42 L6 0 L-6 0Z" fill="#b03a2e"/><path d="M-30 0 L0 4 L30 0 L0-4Z" fill="#5a4428aa"/><path d="M-21-21 L0 0 M21-21 L0 0 M-21 21 L0 0 M21 21 L0 0" stroke="#5a442877"/><circle r="3" fill="#efe2c2" stroke="#3b2a1a"/></svg>
+    <div id="wynikMapa" class="wynikMapa" hidden></div>
+    <div id="menu" class="menu" hidden></div>
+    <div id="dymek" hidden></div>
+    <div class="szukaj"><input id="szukaj" list="krajeLista" placeholder="Szukaj kraju…" autocomplete="off"><datalist id="krajeLista"></datalist></div>
+    <div class="zoom"><button id="zIn" title="Przybliż">+</button><button id="zOut" title="Oddal">−</button><button id="zFit" title="Cały świat">⌂</button></div>
+  </section>
+  <aside id="panel"></aside>
+</main>
+<div id="okno" class="okno" hidden><div class="okno-in"><button class="zamknij" id="oknoX">×</button><div id="oknoTresc"></div></div></div>
+<script src="/topojson-client.min.js"></script>
+<script src="/kraje.js"></script>
+<script src="/gra.js"></script>
+</body>
+</html>
