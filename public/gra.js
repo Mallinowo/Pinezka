@@ -760,7 +760,7 @@ function paszport() {
   const p = store.get('pz-paszport', {}), lista = PANSTWA.slice().sort((a, b) => a.n.localeCompare(b.n, 'pl')), ma = lista.filter(k => p[k.c]), ile = ma.length;
   const kol = ['#b03a2e', '#2e5c8a', '#5b8c3e', '#7d4e9e', '#a0682a'];
   const piecz = ma.map((k, i) => `<div class="pcz" style="--i:${i};--k:${kol[i % kol.length]};--r:${(((i * 37) % 17) - 8)}deg"><small>${esc(k.a3)}</small><b>${esc(k.n)}</b><small>${esc(dataPL(p[k.c], { day: 'numeric', month: 'short' }))}</small></div>`).join('');
-  okno(`<div class="pasz-okl"><div>${IK.pasz}</div><b>PASZPORT</b><small>RZECZPOSPOLITA PINEZKOWA</small></div>
+  okno(`<div class="pasz-okl"><div>${IK.pasz}</div><b>PASZPORT</b><small>DZIENNIK PODRÓŻNIKA · LINIE PINEZKA</small></div>
     <div class="pasz-pasek"><span>Pieczątki</span><b data-licz="${ile}">${ile}</b><span>z ${lista.length}</span><i><em style="--w:${Math.max(1, 100 * ile / lista.length)}%"></em></i></div>
     <div class="pasz-str">${ile ? piecz : '<div class="pusto">Paszport jest jeszcze czysty. Trafna odpowiedź w nowym kraju = pierwsza pieczątka.</div>'}</div>
     <h4 class="ok-h4">JESZCZE NIE ODWIEDZONE · ${lista.length - ile}</h4>
