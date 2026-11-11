@@ -41,8 +41,12 @@ const fale = (() => { const c = document.createElement('canvas'); c.width = 64; 
   for (let i = 0; i < 70; i++) { x.fillStyle = Math.random() < .5 ? '#ffffff26' : '#3d6a7414'; x.fillRect(Math.random() * 64, Math.random() * 48, 1.2, 1.2); }
   return ctx.createPattern(c, 'repeat'); })();
 
+// bez sprzętowej grafiki (np. wyłączona akceleracja w przeglądarce) wszystko liczy procesor: lżejszy tryb
+const LEKKA = (() => { try { const g = document.createElement('canvas').getContext('webgl'); if (!g) return true; const x = g.getExtension('WEBGL_debug_renderer_info');
+  return !!x && /swiftshader|llvmpipe|basic render|software/i.test(g.getParameter(x.UNMASKED_RENDERER_WEBGL)); } catch (e) { return false; } })();
+if (LEKKA) document.body.classList.add('lekka');
 function rozmiar() {
-  const r = cv.getBoundingClientRect(); cw = r.width; ch = r.height; dpr = Math.min(2, window.devicePixelRatio || 1);
+  const r = cv.getBoundingClientRect(); cw = r.width; ch = r.height; dpr = Math.min(LEKKA ? 1 : 2, window.devicePixelRatio || 1);
   cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); ogranicz(); brudne = true;
 }
 const kFit = () => Math.min(cw / (MAPA.x1 - MAPA.x0), ch / (MAPA.y1 - MAPA.y0));
@@ -142,7 +146,7 @@ function rysujMape(c, k, tx, ty, w, h, s, szybko, kolor) {
 }
 // gotowa mapa w pamięci: przy samym przesuwaniu i podświetlaniu nie rysujemy wszystkiego od nowa
 let warstwa = null;
-const MAX_PX = 4096, MAX_POLE = 16e6;
+const MAX_PX = 8192, MAX_POLE = 16e6;
 function zbudujWarstwe(vx0, vy0, vx1, vy1) {
   const m = 14 / V.k, W = [MAPA.x0 - m, MAPA.y0 - m, MAPA.x1 + m, MAPA.y1 + m];
   const skala = (a, b) => Math.min(dpr, MAX_PX / a, MAX_PX / b, Math.sqrt(MAX_POLE / (a * b)));
@@ -165,12 +169,19 @@ function rysuj(szybko) {
   const pasuje = () => warstwa && warstwa.k === V.k && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
     Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
   if (!pasuje() && !szybko && geo.length) zbudujWarstwe(vx0, vy0, vx1, vy1);
-  if (pasuje()) {
+  // w trakcie zoomu: rozciągnięta gotowa mapa (chwilę mniej ostra), ostra wraca, gdy ruch się skończy
+  const rozciag = szybko && !pasuje() && warstwa && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
+    V.k / warstwa.k < 3 && V.k / warstwa.k > .34 &&
+    Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
+  if (pasuje() || rozciag) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = MORZE; ctx.fillRect(0, 0, cw, ch);
-    if (fale) { ctx.save(); ctx.translate(V.tx % 64, V.ty % 48); ctx.fillStyle = fale; ctx.fillRect(-64, -48, cw + 128, ch + 96); ctx.restore(); }
-    const ox = Math.round((warstwa.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((warstwa.r[1] * V.k + V.ty) * dpr) / dpr;
-    ctx.drawImage(warstwa.c, ox, oy, warstwa.c.width / warstwa.s, warstwa.c.height / warstwa.s);
+    const ox = Math.round((warstwa.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((warstwa.r[1] * V.k + V.ty) * dpr) / dpr, f = V.k / warstwa.k;
+    // morze pod spodem tylko wtedy, gdy gotowa mapa nie zakrywa całego ekranu
+    if (ox > 0 || oy > 0 || ox + warstwa.c.width / warstwa.s * f < cw || oy + warstwa.c.height / warstwa.s * f < ch) {
+      ctx.fillStyle = MORZE; ctx.fillRect(0, 0, cw, ch);
+      if (fale) { ctx.save(); ctx.translate(V.tx % 64, V.ty % 48); ctx.fillStyle = fale; ctx.fillRect(-64, -48, cw + 128, ch + 96); ctx.restore(); }
+    }
+    ctx.drawImage(warstwa.c, ox, oy, warstwa.c.width / warstwa.s * f, warstwa.c.height / warstwa.s * f);
     // kraje w innym kolorze niż na gotowej mapie (najechany, wybrany, odpowiedzi)
     ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
     for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { ctx.fillStyle = kol; ctx.fill(g.path); ctx.stroke(g.path); } }
@@ -309,11 +320,31 @@ function rysujMenuLoty(t) {
     ctx.globalAlpha = 1;
   }
 }
-function petla(t) { krokMenu(t); krokKamery(t); const szb = !!kamera || t < ruchDo; if (tryb === 'menu' && (klatka++ & 1)) { requestAnimationFrame(petla); return; } if (bylSzybki && !szb) brudne = true; bylSzybki = szb; if (brudne || radar) { brudne = false; rysuj(szb); } requestAnimationFrame(petla); }
+let ostatniaKl = 0;
+function petla(t) {
+  requestAnimationFrame(petla);
+  // najwyżej ok. 60 klatek (monitory 144 Hz), w menu ok. 30
+  if (t - ostatniaKl < (tryb === 'menu' ? 30 : 14)) return; ostatniaKl = t;
+  if (ruchMyszy) { const m = ruchMyszy; ruchMyszy = null; najedz(m.x, m.y); }
+  krokMenu(t); krokKamery(t); const szb = !!kamera || t < ruchDo;
+  if (bylSzybki && !szb) brudne = true; bylSzybki = szb;
+  if (brudne || radar) { brudne = false; const a = performance.now(); rysuj(szb); if (diag) diag.ms.push(performance.now() - a); }
+  if (diag) diag.kl++;
+}
+// ?diag – licznik klatek do szukania lagów na innych komputerach
+const diag = /[?&]diag\b/.test(location.search) ? { kl: 0, ms: [], ruch: 0, el: document.createElement('pre') } : null;
+if (diag) {
+  diag.el.style.cssText = 'position:fixed;left:8px;bottom:8px;z-index:9999;background:#000c;color:#7f7;font:12px monospace;padding:8px;margin:0;pointer-events:none;white-space:pre';
+  document.body.appendChild(diag.el);
+  let gpu = '?'; try { const g = document.createElement('canvas').getContext('webgl'), x = g && g.getExtension('WEBGL_debug_renderer_info'); gpu = g ? (x ? g.getParameter(x.UNMASKED_RENDERER_WEBGL) : 'webgl') : 'brak webgl'; } catch (e) {}
+  setInterval(() => { const ms = diag.ms.sort((a, b) => a - b), sr = ms.length ? ms.reduce((a, b) => a + b, 0) / ms.length : 0;
+    diag.el.textContent = (LEKKA ? 'TRYB LEKKI (brak akceleracji)\n' : '') + `klatki/s ${diag.kl}  rysowania ${ms.length}\nśr ${sr.toFixed(1)} ms  max ${(ms[ms.length - 1] || 0).toFixed(1)} ms\nruch myszy/s ${diag.ruch}\ndpr ${dpr}  płótno ${cv.width}×${cv.height}\nwarstwa ${warstwa ? warstwa.c.width + '×' + warstwa.c.height : '-'}\nGPU ${gpu}`;
+    diag.kl = 0; diag.ms = []; diag.ruch = 0; }, 1000);
+}
 const odswiez = () => { brudne = true; };
 
 // ---------- mysz / dotyk ----------
-const wsk = new Map(); let ciag = null, pinch = null;
+const wsk = new Map(); let ciag = null, pinch = null, ruchMyszy = null;
 cv.addEventListener('pointerdown', e => {
   cv.setPointerCapture(e.pointerId); wsk.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); kamera = null;
   if (wsk.size === 1) ciag = { x: e.offsetX, y: e.offsetY, tx: V.tx, ty: V.ty, ruch: 0 };
@@ -326,7 +357,7 @@ cv.addEventListener('pointermove', e => {
     const dx = e.offsetX - ciag.x, dy = e.offsetY - ciag.y; ciag.ruch = Math.max(ciag.ruch, Math.abs(dx) + Math.abs(dy));
     if (ciag.ruch > 5) { ruszam(); V.tx = ciag.tx + dx; V.ty = ciag.ty + dy; ogranicz(); odswiez(); cv.style.cursor = 'grabbing'; }
   }
-  if (e.pointerType === 'mouse' && !ciag) najedz(e.offsetX, e.offsetY);
+  if (e.pointerType === 'mouse' && !ciag) { ruchMyszy = { x: e.offsetX, y: e.offsetY }; if (diag) diag.ruch++; }
 });
 cv.addEventListener('pointerup', e => {
   const klikniecie = ciag && ciag.ruch <= 5 && wsk.size === 1;
@@ -335,7 +366,7 @@ cv.addEventListener('pointerup', e => {
   if (!wsk.size) ciag = null;
 });
 cv.addEventListener('pointercancel', e => { wsk.delete(e.pointerId); ciag = null; pinch = null; });
-cv.addEventListener('pointerleave', () => { najechany = null; $('#dymek').hidden = true; odswiez(); });
+cv.addEventListener('pointerleave', () => { ruchMyszy = null; najechany = null; $('#dymek').hidden = true; odswiez(); });
 function zoomW(x, y, f) {
   const [px, py] = naProj(x, y); V.k *= f; ogranicz(); V.tx = x - px * V.k; V.ty = y - py * V.k; ogranicz(); odswiez();
 }

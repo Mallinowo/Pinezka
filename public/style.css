@@ -422,3 +422,4 @@ body.w-slepa .szukaj{display:none}
 .slepa-tog .tx b{color:var(--czerw)}
 .slepa-tog .tx small{display:block;font-size:9px;color:var(--szary);letter-spacing:.04em}
 .slepa-tog.zab{cursor:default;opacity:.75}
+body.lekka .chmury{display:none}
