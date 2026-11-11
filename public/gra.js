@@ -121,28 +121,63 @@ function kolorKraju(g) {
 function lerpKol(a, b, q) { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), f = (s) => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * q); return `rgb(${f(16)},${f(8)},${f(0)})`; }
 function mieszaj(hex, a) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return `rgb(${Math.round(255 - (255 - r) * a)},${Math.round(255 - (255 - g) * a)},${Math.round(255 - (255 - b) * a)})`; }
 
+const kolorBazy = g => PO_KODZIE[g.c].t ? '#e2d3ae' : '#efe2c2';
+// rysuje morze, siatkę, płycizny, cień i kraje; c = kontekst, k/tx/ty = widok, w/h = rozmiar w px CSS, s = skala pikseli
+function rysujMape(c, k, tx, ty, w, h, s, szybko, kolor) {
+  const ek = (lon, lat) => [prX(lon) * k + tx, prY(lat) * k + ty];
+  c.setTransform(s, 0, 0, s, 0, 0);
+  c.fillStyle = MORZE; c.fillRect(0, 0, w, h);
+  if (fale) { c.save(); c.translate(tx % 64, ty % 48); c.fillStyle = fale; c.fillRect(-64, -48, w + 128, h + 96); c.restore(); }
+  c.strokeStyle = '#5f859066'; c.lineWidth = .8; c.setLineDash([4, 4]); c.beginPath();
+  for (let lon = -180; lon <= 180; lon += 30) { const [x] = ek(lon, 0); c.moveTo(x, ek(0, 84)[1]); c.lineTo(x, ek(0, -57)[1]); }
+  for (let lat = -45; lat <= 75; lat += 15) { const [, y] = ek(0, lat); c.moveTo(ek(-180, 0)[0], y); c.lineTo(ek(180, 0)[0], y); }
+  c.stroke(); c.setLineDash([]);
+  c.setTransform(s * k, 0, 0, s * k, s * tx, s * ty); c.lineJoin = 'round';
+  const m = 12 / k, x0 = -tx / k - m, y0 = -ty / k - m, x1 = (w - tx) / k + m, y1 = (h - ty) / k + m;
+  const wid = geo.filter(g => !(g.bb[2] < x0 || g.bb[0] > x1 || g.bb[3] < y0 || g.bb[1] > y1));
+  for (const [lw, kol] of szybko ? [[6, '#bcd3d2']] : [[22, '#7f9fa6'], [20.6, MORZE], [14, '#7f9fa6'], [12.6, MORZE], [6, '#bcd3d2']]) { c.strokeStyle = kol; c.lineWidth = lw / k; for (const g of wid) c.stroke(g.path); }
+  if (!szybko) { c.save(); c.translate(1.5 / k, 2.5 / k); c.fillStyle = '#5a462a40'; for (const g of wid) c.fill(g.path); c.restore(); }
+  for (const g of wid) { c.fillStyle = kolor(g); c.fill(g.path); }
+  c.strokeStyle = '#7a6142'; c.lineWidth = 1 / k; for (const g of wid) c.stroke(g.path);
+}
+// gotowa mapa w pamięci: przy samym przesuwaniu i podświetlaniu nie rysujemy wszystkiego od nowa
+let warstwa = null;
+const MAX_PX = 4096, MAX_POLE = 16e6;
+function zbudujWarstwe(vx0, vy0, vx1, vy1) {
+  const m = 14 / V.k, W = [MAPA.x0 - m, MAPA.y0 - m, MAPA.x1 + m, MAPA.y1 + m];
+  const skala = (a, b) => Math.min(dpr, MAX_PX / a, MAX_PX / b, Math.sqrt(MAX_POLE / (a * b)));
+  let r = W, s = skala((W[2] - W[0]) * V.k, (W[3] - W[1]) * V.k);
+  if (s < dpr * .7 && !(tryb === 'menu' && s >= .45)) {
+    const dx = (vx1 - vx0) * .5, dy = (vy1 - vy0) * .5;
+    r = [Math.max(W[0], vx0 - dx), Math.max(W[1], vy0 - dy), Math.min(W[2], vx1 + dx), Math.min(W[3], vy1 + dy)];
+    s = skala((r[2] - r[0]) * V.k, (r[3] - r[1]) * V.k);
+  }
+  const w = (r[2] - r[0]) * V.k, h = (r[3] - r[1]) * V.k;
+  const c = (warstwa && warstwa.c) || document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+  rysujMape(c.getContext('2d'), V.k, -r[0] * V.k, -r[1] * V.k, w, h, s, false, kolorBazy);
+  warstwa = { c, k: V.k, s, r, n: geo.length, cw, ch };
+}
 function rysuj(szybko) {
   const t = performance.now();
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.fillStyle = MORZE; ctx.fillRect(0, 0, cw, ch);
-  if (fale) { ctx.save(); ctx.translate(V.tx % 64, V.ty % 48); ctx.fillStyle = fale; ctx.fillRect(-64, -48, cw + 128, ch + 96); ctx.restore(); }
-  // siatka geograficzna
-  ctx.strokeStyle = '#5f859066'; ctx.lineWidth = .8; ctx.setLineDash([4, 4]); ctx.beginPath();
-  for (let lon = -180; lon <= 180; lon += 30) { const [x] = naEkran(lon, 0); ctx.moveTo(x, naEkran(0, 84)[1]); ctx.lineTo(x, naEkran(0, -57)[1]); }
-  for (let lat = -45; lat <= 75; lat += 15) { const [, y] = naEkran(0, lat); ctx.moveTo(naEkran(-180, 0)[0], y); ctx.lineTo(naEkran(180, 0)[0], y); }
-  ctx.stroke(); ctx.setLineDash([]);
-  // kraje
-  ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty);
-  ctx.lineJoin = 'round';
   const [vx0, vy0] = naProj(0, 0), [vx1, vy1] = naProj(cw, ch);
   for (const g of geo) g.ukryty = g.bb[2] < vx0 || g.bb[0] > vx1 || g.bb[3] < vy0 || g.bb[1] > vy1;
-  // płycizna przy brzegach
-  for (const [w, kol] of szybko ? [[6, '#bcd3d2']] : [[22, '#7f9fa6'], [20.6, MORZE], [14, '#7f9fa6'], [12.6, MORZE], [6, '#bcd3d2']]) { ctx.strokeStyle = kol; ctx.lineWidth = w / V.k; for (const g of geo) if (!g.ukryty) ctx.stroke(g.path); }
-  // cień lądu
-  if (!szybko) { ctx.save(); ctx.translate(1.5 / V.k, 2.5 / V.k); ctx.fillStyle = '#5a462a40'; for (const g of geo) if (!g.ukryty) ctx.fill(g.path); ctx.restore(); }
-  for (const g of geo) if (!g.ukryty) { ctx.fillStyle = kolorKraju(g); ctx.fill(g.path); }
-  ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
-  for (const g of geo) if (!g.ukryty) ctx.stroke(g.path);
+  const pasuje = () => warstwa && warstwa.k === V.k && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
+    Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
+  if (!pasuje() && !szybko && geo.length) zbudujWarstwe(vx0, vy0, vx1, vy1);
+  if (pasuje()) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = MORZE; ctx.fillRect(0, 0, cw, ch);
+    if (fale) { ctx.save(); ctx.translate(V.tx % 64, V.ty % 48); ctx.fillStyle = fale; ctx.fillRect(-64, -48, cw + 128, ch + 96); ctx.restore(); }
+    const ox = Math.round((warstwa.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((warstwa.r[1] * V.k + V.ty) * dpr) / dpr;
+    ctx.drawImage(warstwa.c, ox, oy, warstwa.c.width / warstwa.s, warstwa.c.height / warstwa.s);
+    // kraje w innym kolorze niż na gotowej mapie (najechany, wybrany, odpowiedzi)
+    ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
+    for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { ctx.fillStyle = kol; ctx.fill(g.path); ctx.stroke(g.path); } }
+  } else {
+    rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, szybko, kolorKraju);
+  }
+  ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round';
   // obrys wybranego / najechanego
   const obrys = (c, kol, w) => { const g = geo.find(g => g.c === c); if (g) { ctx.strokeStyle = kol; ctx.lineWidth = w / V.k; ctx.stroke(g.path); } };
   if (najechany && najechany !== wybrany && !PO_KODZIE[najechany].t) obrys(najechany, '#a8742a', 1.8);

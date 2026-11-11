@@ -26,7 +26,7 @@ nav button:hover{background:#fff6e0}
 nav button.wyl{opacity:.45}
 main{display:flex;gap:14px;height:calc(100% - 56px);padding:0 14px 14px}
 #mapa{position:relative;flex:1;min-width:0;overflow:hidden;touch-action:none;background:#a9c4c8;border:10px solid var(--papier);outline:1px solid var(--tusz2);outline-offset:-14px;box-shadow:0 10px 30px #0008,inset 0 0 0 1px #0002}
-#mapa::before{content:"";position:absolute;inset:0;background:var(--szum);opacity:.7;mix-blend-mode:multiply;pointer-events:none;z-index:1}
+#mapa::before{content:"";position:absolute;inset:0;background:var(--szum);opacity:.7;pointer-events:none;z-index:1}
 #cv{display:block;width:100%;height:100%;cursor:crosshair}
 #dymek{position:absolute;pointer-events:none;background:var(--papier);color:var(--tusz);border:1px solid var(--tusz2);padding:4px 9px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;z-index:4;transform:translate(14px,-34px);box-shadow:2px 3px 0 #3b2a1a33}
 .szukaj{position:absolute;left:14px;top:14px;z-index:3}
@@ -38,7 +38,7 @@ main{display:flex;gap:14px;height:calc(100% - 56px);padding:0 14px 14px}
 .zoom button:hover{background:#fff6e0}
 .chmury,.winieta{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
 .winieta{background:radial-gradient(ellipse at center,#0000 55%,#5a3a1a40 100%)}
-.chmury i{position:absolute;width:260px;height:90px;border-radius:50%;background:radial-gradient(ellipse at center,#fffaf0aa 0%,#fffaf044 45%,#fff0 70%);filter:blur(6px);animation:chm 90s linear infinite;left:-300px}
+.chmury i{position:absolute;width:260px;height:90px;border-radius:50%;background:radial-gradient(ellipse at center,#fffaf0aa 0%,#fffaf044 45%,#fff0 70%);filter:blur(6px);animation:chm 90s linear infinite;will-change:transform;left:-300px}
 .chmury i:nth-child(1){top:12%;animation-duration:110s;animation-delay:-20s}
 .chmury i:nth-child(2){top:38%;width:340px;height:110px;animation-duration:140s;animation-delay:-80s;opacity:.6}
 .chmury i:nth-child(3){top:63%;animation-duration:120s;animation-delay:-50s}
