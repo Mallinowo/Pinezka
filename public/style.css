@@ -423,3 +423,11 @@ body.w-slepa .szukaj{display:none}
 .slepa-tog .tx small{display:block;font-size:9px;color:var(--szary);letter-spacing:.04em}
 .slepa-tog.zab{cursor:default;opacity:.75}
 body.lekka .chmury{display:none}
+
+/* licznik graczy na koniec lotu */
+.licznik-gr{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 14px;border:1.5px dashed #b9a57f;border-radius:4px;background:#f6edd6;font-size:14px;line-height:1.35;animation:licznikWjazd .5s .3s both}
+.licznik-gr b{font-size:20px;color:#c0392b;font-weight:700}
+.licznik-gr small{display:block;font-size:12px;color:#7a6142;margin-top:2px}
+.licznik-gr small b{font-size:12px;color:inherit}
+.licznik-gr .ik{font-size:22px;color:#16324f;transform:rotate(-12deg)}
+@keyframes licznikWjazd{from{opacity:0;transform:translateY(6px)}}

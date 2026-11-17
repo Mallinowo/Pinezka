@@ -14,7 +14,8 @@ async function laduj() {
   try { D = await api('przeglad'); } catch (e) { if (e.s === 401 || e.s === 429) { sessionStorage.removeItem('pz-adm'); KEY = ''; return login(e.message); } toast(e.message); return; }
   $('#nav').hidden = false;
   const dni = D.dniZPytaniami - D.dzis + 1;
-  $('#info').textContent = `Dziś lot ${D.dzis} (${D.data}) · ${D.pytan} pytań · nowe pytania wystarczą do ${D.koniecPuli} (${dni} dni)`;
+  const d0 = D.dni[0] || {};
+  $('#info').innerHTML = `<b>Dziś osób: weszło ${d0.wejscia || 0} · zaczęło lot ${d0.starty || 0} · ukończyło ${d0.graczy || 0}</b><br>Lot ${D.dzis} (${D.data}) · ${D.pytan} pytań · nowe pytania wystarczą do ${D.koniecPuli} (${dni} dni)`;
   $('#info').classList.toggle('zle', dni < 7);
   rysuj();
 }
@@ -38,7 +39,7 @@ function rysuj() {
     m.querySelectorAll('.zal').forEach(b => b.onclick = async () => { const k = b.closest('.karta'), z = D.zgloszenia.find(z => z.id === k.dataset.id); await api('zalatw', { id: z.id, cofnij: z.zalatwione }); z.zalatwione = !z.zalatwione; rysuj(); });
   }
   if (tab === 'dni') {
-    m.innerHTML = D.dni.map(d => `<div class="karta"><h3>Lot ${d.nr} · ${d.data}</h3><div class="meta">${d.graczy} ukończonych lotów · średnio ${d.srednio} mil</div>
+    m.innerHTML = D.dni.map(d => `<div class="karta"><h3>Lot ${d.nr} · ${d.data}</h3><div class="meta">osób: ${d.wejscia ? 'weszło ' + d.wejscia + ' · ' : ''}zaczęło ${d.starty} · ukończyło ${d.graczy} · średnio ${d.srednio} mil</div>
       ${d.pytania.map((p, i) => { const w = Object.entries(p.wybory).sort((a, b) => b[1] - a[1]), raz = w.reduce((a, b) => a + b[1], 0);
         return `<div style="margin-top:10px"><b>${i + 1}. ${esc(p.q)}</b> <span class="meta">(${raz} odpowiedzi)</span><div class="wyb">${w.length ? w.map(([c, n]) => `<span class="${p.o[c] ? 'dobry' : 'zly'}" data-q="${esc(p.q)}" data-c="${c}" title="${p.o[c] ? POZ[p.o[c]] : 'kliknij, aby dodać do odpowiedzi'}">${esc(nazwa(c))} ${Math.round(100 * n / raz)}%</span>`).join('') : '<span>brak danych</span>'}</div></div>`; }).join('')}</div>`).join('');
     m.querySelectorAll('.wyb .zly').forEach(s => s.onclick = () => { const k = s.closest('div'); if (k.nextElementSibling && k.nextElementSibling.classList.contains('dz')) return; k.insertAdjacentHTML('afterend', dodajForm(s.dataset.q, s.dataset.c, 3)); podepnij(); });

@@ -112,6 +112,8 @@ http.createServer(async (req, res) => {
       const nr = nrOk(u.searchParams.get('nr') || nrDnia());
       if (!nr) return json(res, 404, { blad: 'Brak takiego lotu' });
       const dzis = dzisiaj(), jutro = new Date(Date.parse(dzis) + 864e5);
+      // licznik odwiedzin: jedna osoba (skrót IP z solą zmienianą codziennie) liczy się raz dziennie
+      if (nr === nrDnia() && raz(req, 'w' + nr)) { const d = dzienSt(nr); d.wejscia = (d.wejscia || 0) + 1; brudne = true; }
       return json(res, 200, { nr, data: dataNr(nr), dzisiejszy: nrDnia(), pytania: pytaniaDnia(nr).map(i => ({ q: pytania[i].q, u: pytania[i].u })),
         doNastepnego: msDoPolnocy() });
     }
@@ -119,6 +121,7 @@ http.createServer(async (req, res) => {
       const b = await body(req), nr = nrOk(b.nr), i = +b.i, kraj = String(b.kraj || '').slice(0, 2);
       if (!nr || !(i >= 0 && i < NA_DZIEN) || !KOTWICA[kraj]) return json(res, 400, { blad: 'Złe dane' });
       const P = pytania[pytaniaDnia(nr)[i]], poz = P.o[kraj] || 0;
+      if (raz(req, 's' + nr)) { const d = dzienSt(nr); d.starty = (d.starty || 0) + 1; brudne = true; }
       if (raz(req, 'o' + nr + ':' + i)) { const w = dzienSt(nr).wybory, k = w[i] || (w[i] = {}); k[kraj] = (k[kraj] || 0) + 1; brudne = true; }
       return json(res, 200, { poziom: poz, pkt: Math.round(PKT[poz] * (b.slepa ? SLEPA : 1)), fakt: poz ? (P.f[kraj] || P.f['*'] || '') : '' });
     }
@@ -126,7 +129,7 @@ http.createServer(async (req, res) => {
       const nr = nrOk(u.searchParams.get('nr'));
       if (!nr) return json(res, 404, { blad: 'Brak' });
       const d = dzienSt(nr);
-      return json(res, 200, { pytania: pytaniaDnia(nr).map((ix, i) => ({ ...pytania[ix], wybory: d.wybory[i] || {} })), graczy: d.wyniki.length });
+      return json(res, 200, { pytania: pytaniaDnia(nr).map((ix, i) => ({ ...pytania[ix], wybory: d.wybory[i] || {} })), graczy: d.wyniki.length, zagralo: Math.max(d.starty || 0, d.wyniki.length) });
     }
     if (p === '/api/zgloszenie' && req.method === 'POST') {
       if (!limit(req, 'zg', 10, 36e5)) return json(res, 429, { blad: 'Za dużo zgłoszeń – spróbuj za godzinę.' });
@@ -167,7 +170,7 @@ async function admin(req, res, p, u) {
   if (p === '/api/admin/przeglad') {
     const dzis = nrDnia(), dni = [];
     for (let nr = dzis; nr >= Math.max(1, dzis - 13); nr--) { const d = st.dni[nr] || { wyniki: [], wybory: {} }, W = d.wyniki;
-      dni.push({ nr, data: dataNr(nr), graczy: W.length, srednio: W.length ? Math.round(W.reduce((a, b) => a + b, 0) / W.length) : 0,
+      dni.push({ nr, data: dataNr(nr), graczy: W.length, wejscia: d.wejscia || 0, starty: d.starty || 0, srednio: W.length ? Math.round(W.reduce((a, b) => a + b, 0) / W.length) : 0,
         pytania: pytaniaDnia(nr).map((ix, i) => ({ q: pytania[ix].q, o: pytania[ix].o, wybory: d.wybory[i] || {} })) }); }
     let zg = []; try { zg = fs.readFileSync(PLIK_ZG, 'utf8').trim().split('\n').filter(Boolean).map(l => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean); } catch {}
     zg = zg.map((z, k) => ({ ...z, id: z.id || 'L' + k, zalatwione: !!zgStan[z.id || 'L' + k] })).reverse().slice(0, 500);

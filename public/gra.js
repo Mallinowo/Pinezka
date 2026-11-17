@@ -773,6 +773,14 @@ async function zakoncz() {
 }
 
 let aktywne = -1;
+const osob = n => n === 1 ? 'osoba' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'osoby' : 'osób';
+function licznikGraczy(rk) {
+  const n = wyniki && wyniki.zagralo, teraz = dzien.nr === dzien.dzisiejszy;
+  if (!n) return '';
+  const gora = n === 1 && teraz ? 'Jesteś dziś pierwszym pilotem na trasie!' : `${teraz ? 'Dziś' : 'Ten lot'} ${n === 1 ? 'zagrała' : 'zagrało'} <b>${n}</b> ${osob(n)}`;
+  const dol = rk && rk.graczy > 1 && teraz ? `Twój wynik jest lepszy niż <b>${rk.lepszyNiz}%</b> pilotów` : '';
+  return `<div class="licznik-gr"><span class="ik">✈</span><div>${gora}${dol ? `<small>${dol}</small>` : ''}</div></div>`;
+}
 async function pokazKoniec() {
   tryb = 'koniec'; document.body.classList.remove('w-slepa'); radar = null; wybrany = null; koniecT0 = performance.now() + 300; $('#wynikMapa').hidden = true;
   try { wyniki = await api('/api/wyniki?nr=' + dzien.nr); } catch { wyniki = null; }
@@ -781,7 +789,7 @@ async function pokazKoniec() {
   $('#panel').innerHTML = `<div class="tablica"><div class="nag"><span>PRZYLOTY · ${nrLotu()}${stan.slepa ? ' · 🙈 ŚLEPA MAPA' : ''}</span><span>${new Date(dzien.data + 'T12:00:00').toLocaleDateString('pl-PL')}</span></div>
     ${stan.odp.map((o, i) => `<div class="wiersz" style="--d:${i}"><span>${i + 1}</span><span class="kr"><span class="fl">${o.kraj ? esc(PO_KODZIE[o.kraj].a3) : '⏱'}</span> ${esc(nazwa(o.kraj))}</span><span class="st k${o.poziom}">${o.kraj ? POZ[o.poziom].toUpperCase() : 'CZAS!'}</span><span class="mi">${o.pkt}</span></div>`).join('')}
     <div class="suma"><span class="kolory">${stan.odp.map(o => `<i style="background:${KOL[o.poziom]}"></i>`).join('')}</span><span><b>${suma()}</b> mil</span></div></div>
-    <div class="sekcja">${rk && rk.graczy > 1 ? `<div class="uw" style="text-align:center;margin-bottom:10px">Lepiej niż <b>${rk.lepszyNiz}%</b> z ${rk.graczy} pilotów dzisiaj</div>` : ''}
+    <div class="sekcja">${licznikGraczy(rk)}
     <div class="akcje" style="padding:0"><button class="btn glowny" id="bUdostepnij">Udostępnij wynik</button><button class="btn" id="bMenu">Menu</button></div>
     <div class="statyst"><div><b>${s.n}</b>dni z rzędu</div><div><b>${pasz}</b>pieczątek</div><div><b id="odliczanie">–</b>do lotu ${dzis.nr + 1}</div></div></div>
     <div class="sekcja"><h4>ODPOWIEDZI · KLIKNIJ, ŻEBY ZOBACZYĆ NA MAPIE</h4>${stan.odp.map((o, i) => `<div class="odp" data-i="${i}"><div class="q">${i + 1}. ${esc(dzien.pytania[i].q)}</div>
