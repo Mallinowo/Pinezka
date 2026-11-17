@@ -38,8 +38,18 @@ function staraKolejnosc(cykl) {
   return a;
 }
 const PRZYPIETE = []; for (let nr = 1; nr <= PRZYPIETE_DNI; nr++) for (let k = 0; k < NA_DZIEN; k++) { const g = (nr - 1) * NA_DZIEN + k; PRZYPIETE.push(staraKolejnosc(Math.floor(g / STARA_PULA))[g % STARA_PULA]); }
-// cykl 0: pytania jeszcze niegrane (losowo), potem kolejne cykle po całej puli
-const RESZTA = (() => { const uzyte = new Set(PRZYPIETE), a = kolejnosc(0).filter(i => !uzyte.has(i)); return a; })();
+// cykl 0: pytania jeszcze niegrane, partia po partii (każda partia tasowana osobno), potem kolejne cykle po całej puli.
+// Nowe pytania dopisuj na KOŃCU pytania.js i dodaj tu rozmiar puli po partii – dni już ustalone się nie zmienią.
+const PARTIE = [92, 148];
+function tasuj(od, ile, seed) {
+  const r = los(seed), a = Array.from({ length: ile }, (_, i) => od + i);
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+const RESZTA = (() => { const uzyte = new Set(PRZYPIETE), a = tasuj(0, PARTIE[0], 7919).filter(i => !uzyte.has(i));
+  for (let k = 1; k < PARTIE.length; k++) a.push(...tasuj(PARTIE[k - 1], Math.min(PARTIE[k], pytania.length) - PARTIE[k - 1], 7919 * (k + 100)));
+  if (pytania.length > PARTIE[PARTIE.length - 1]) a.push(...tasuj(PARTIE[PARTIE.length - 1], pytania.length - PARTIE[PARTIE.length - 1], 31337));
+  return a; })();
 function pytaniaDnia(nr) {
   if (nr <= PRZYPIETE_DNI) return PRZYPIETE.slice((nr - 1) * NA_DZIEN, nr * NA_DZIEN);
   const L = pytania.length, out = [];
