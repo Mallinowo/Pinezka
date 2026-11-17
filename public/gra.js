@@ -57,7 +57,9 @@ function ogranicz() {
   V.ty = h <= ch ? (ch - h) / 2 - MAPA.y0 * V.k : Math.min(-MAPA.y0 * V.k, Math.max(ch - MAPA.y1 * V.k, V.ty));
 }
 function wysrodkuj(lon, lat, k) { if (k) V.k = k; ogranicz(); V.tx = cw / 2 - prX(lon) * V.k; V.ty = ch / 2 - prY(lat) * V.k; ogranicz(); brudne = true; }
+let dopasowano = 0;
 function dopasuj() {
+  dopasowano = performance.now();
   if (cw < 600) { V.k = ch / (MAPA.y1 - MAPA.y0) * 1.15; wysrodkuj(25, 30, V.k); }
   else { V.k = kFit(); V.tx = 0; V.ty = 0; ogranicz(); }
   brudne = true;
@@ -363,8 +365,10 @@ const odswiez = () => { brudne = true; };
 // ---------- mysz / dotyk ----------
 const wsk = new Map(); let ciag = null, pinch = null, ruchMyszy = null;
 cv.addEventListener('pointerdown', e => {
-  cv.setPointerCapture(e.pointerId); wsk.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); kamera = null;
-  if (wsk.size === 1) ciag = { x: e.offsetX, y: e.offsetY, tx: V.tx, ty: V.ty, ruch: 0 };
+  if (e.isPrimary) { wsk.clear(); pinch = null; } // nowy gest: zapomnij palce, których puszczenia przeglądarka nie zgłosiła
+  try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+  wsk.set(e.pointerId, { x: e.offsetX, y: e.offsetY }); kamera = null;
+  if (wsk.size === 1) ciag = { x: e.offsetX, y: e.offsetY, tx: V.tx, ty: V.ty, ruch: 0, prog: e.pointerType === 'mouse' ? 5 : 14 };
   if (wsk.size === 2) { const [a, b] = [...wsk.values()]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: V.k, cx: (a.x + b.x) / 2, cy: (a.y + b.y) / 2 }; ciag = null; }
 });
 cv.addEventListener('pointermove', e => {
@@ -372,12 +376,12 @@ cv.addEventListener('pointermove', e => {
   if (pinch && wsk.size === 2) { ruszam(); const [a, b] = [...wsk.values()]; zoomW(pinch.cx, pinch.cy, pinch.k * Math.hypot(a.x - b.x, a.y - b.y) / Math.max(20, pinch.d) / V.k); return; }
   if (ciag) {
     const dx = e.offsetX - ciag.x, dy = e.offsetY - ciag.y; ciag.ruch = Math.max(ciag.ruch, Math.abs(dx) + Math.abs(dy));
-    if (ciag.ruch > 5) { ruszam(); V.tx = ciag.tx + dx; V.ty = ciag.ty + dy; ogranicz(); odswiez(); cv.style.cursor = 'grabbing'; }
+    if (ciag.ruch > ciag.prog) { ruszam(); V.tx = ciag.tx + dx; V.ty = ciag.ty + dy; ogranicz(); odswiez(); cv.style.cursor = 'grabbing'; }
   }
   if (e.pointerType === 'mouse' && !ciag) { ruchMyszy = { x: e.offsetX, y: e.offsetY }; if (diag) diag.ruch++; }
 });
 cv.addEventListener('pointerup', e => {
-  const klikniecie = ciag && ciag.ruch <= 5 && wsk.size === 1;
+  const klikniecie = ciag && ciag.ruch <= ciag.prog && wsk.size === 1;
   wsk.delete(e.pointerId); if (wsk.size < 2) pinch = null; cv.style.cursor = '';
   if (klikniecie) klik(e.offsetX, e.offsetY);
   if (!wsk.size) ciag = null;
@@ -870,6 +874,11 @@ function paszport() {
 }
 $('#bPaszport').onclick = paszport;
 window.addEventListener('resize', () => { rozmiar(); });
+// płótno zmienia rozmiar także bez zmiany okna (np. na telefonie panel pod mapą rośnie po starcie pytania)
+if (window.ResizeObserver) new ResizeObserver(() => {
+  const r = cv.getBoundingClientRect(); if (!r.width || !r.height || (Math.abs(r.width - cw) < 1 && Math.abs(r.height - ch) < 1)) return;
+  rozmiar(); if (performance.now() - dopasowano < 2000) dopasuj();
+}).observe(cv);
 start();
 window.__pz = { get stan() { return stan; } };
 })();
