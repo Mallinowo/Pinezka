@@ -175,6 +175,7 @@ function zbudujWarstwe(vx0, vy0, vx1, vy1) {
   rysujMape(c.getContext('2d'), V.k, -r[0] * V.k, -r[1] * V.k, w, h, s, false, kolorBazy);
   warstwa = { c, k: V.k, s, r, n: geo.length, cw, ch };
 }
+let koszt = LEKKA ? 1e9 : 0; // średni czas ostrego rysowania w ruchu (ms)
 function rysuj(szybko) {
   const t = performance.now();
   const [vx0, vy0] = naProj(0, 0), [vx1, vy1] = naProj(cw, ch);
@@ -189,8 +190,11 @@ function rysuj(szybko) {
   const rozciag = szybko && !pasuje() && warstwa && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
     V.k / warstwa.k < 3 && V.k / warstwa.k > .34 &&
     Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
-  const W = pasuje() || rozciag ? warstwa : swiatOk || (szybko && swiat && swiat.n === geo.length) ? swiat : null;
+  // w ruchu: szybkie urządzenia rysują mapę na ostro, wolniejsze przesuwają gotowy obraz
+  const ostro = szybko && !pasuje() && !rozciag && koszt < 9;
+  const W = ostro ? null : pasuje() || rozciag ? warstwa : swiatOk || (szybko && swiat && swiat.n === geo.length) ? swiat : null;
   if (W) {
+    if (szybko && koszt < 1e8) koszt *= .98; // co jakiś czas spróbuj znowu na ostro
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const ox = Math.round((W.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((W.r[1] * V.k + V.ty) * dpr) / dpr, f = V.k / W.k;
     // morze pod spodem tylko wtedy, gdy gotowa mapa nie zakrywa całego ekranu
@@ -205,7 +209,8 @@ function rysuj(szybko) {
     ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
     for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { ctx.fillStyle = kol; ctx.fill(g.path); ctx.stroke(g.path); } }
   } else {
-    rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, szybko, kolorKraju);
+    const a = performance.now(); rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, ostro ? false : szybko, kolorKraju);
+    if (ostro) { const d = performance.now() - a; koszt = koszt ? koszt * .7 + d * .3 : d; }
   }
   ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round';
   // obrys wybranego / najechanego
