@@ -129,7 +129,7 @@ http.createServer(async (req, res) => {
       const nr = nrOk(u.searchParams.get('nr'));
       if (!nr) return json(res, 404, { blad: 'Brak' });
       const d = dzienSt(nr);
-      return json(res, 200, { pytania: pytaniaDnia(nr).map((ix, i) => ({ ...pytania[ix], wybory: d.wybory[i] || {} })), graczy: d.wyniki.length, zagralo: Math.max(d.starty || 0, d.wyniki.length) });
+      return json(res, 200, { pytania: pytaniaDnia(nr).map((ix, i) => ({ ...pytania[ix], wybory: d.wybory[i] || {} })), graczy: d.wyniki.length, rozklad: d.wyniki.slice().sort((x, y) => x - y), zagralo: Math.max(d.starty || 0, d.wyniki.length) });
     }
     if (p === '/api/zgloszenie' && req.method === 'POST') {
       if (!limit(req, 'zg', 10, 36e5)) return json(res, 429, { blad: 'Za dużo zgłoszeń – spróbuj za godzinę.' });

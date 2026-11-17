@@ -431,3 +431,18 @@ body.lekka .chmury{display:none}
 .licznik-gr small b{font-size:12px;color:inherit}
 .licznik-gr .ik{font-size:22px;color:#16324f;transform:rotate(-12deg)}
 @keyframes licznikWjazd{from{opacity:0;transform:translateY(6px)}}
+
+.wykres-gr{position:relative;margin:0 0 14px;padding:10px 12px 8px;border:1.5px solid #cdb98f;border-radius:4px;background:#f8f0dc;animation:licznikWjazd .5s .45s both}
+.wykres-gr h4{margin:0 0 6px;font-size:11px;letter-spacing:.14em;color:#7a6142}
+.wykres-gr svg{display:block;width:100%;height:96px;overflow:visible}
+.wykres-gr .w-pole{fill:#2e5c8a22}
+.wykres-gr .w-linia{fill:none;stroke:#2e5c8a;stroke-width:2;vector-effect:non-scaling-stroke}
+.wykres-gr .w-ty{stroke:#b03a2e;stroke-width:1.5;stroke-dasharray:3 3;vector-effect:non-scaling-stroke}
+.wykres-gr .w-pin{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#b03a2e;border:2px solid #f8f0dc;box-shadow:0 1px 3px #0006}
+.wykres-gr .w-pl{position:relative}
+.wykres-gr .w-os{position:relative;height:16px;margin-top:3px;border-top:1px solid #cdb98f;font-size:10px;color:#8a7658}
+.wykres-gr .w-os span,.wykres-gr .w-os b{position:absolute;top:2px;transform:translateX(-50%)}
+.wykres-gr .w-os span:first-child{transform:none}
+.wykres-gr .w-os b{color:#b03a2e;background:#f8f0dc;padding:0 3px;z-index:1}
+.wykres-gr p{margin:8px 0 0;font-size:13px}
+.wykres-gr p b{color:#b03a2e}

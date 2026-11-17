@@ -790,6 +790,24 @@ function licznikGraczy(rk) {
   const dol = rk && rk.graczy > 1 && teraz ? `Twój wynik jest lepszy niż <b>${rk.lepszyNiz}%</b> pilotów` : '';
   return `<div class="licznik-gr"><span class="ik">✈</span><div>${gora}${dol ? `<small>${dol}</small>` : ''}</div></div>`;
 }
+function wykresGraczy(moje) {
+  const W = (wyniki && wyniki.rozklad) || [], n = W.length;
+  if (n < 3) return '';
+  const MAX = Math.max(700, ...W, moje), sr = W.reduce((a, b) => a + b, 0) / n;
+  const sd = Math.sqrt(W.reduce((a, b) => a + (b - sr) ** 2, 0) / n) || 60, h = Math.max(25, 1.06 * sd * Math.pow(n, -0.2));
+  const xs = [], ys = [];
+  for (let x = 0; x <= MAX; x += 5) { let y = 0; for (const v of W) y += Math.exp(-0.5 * ((x - v) / h) ** 2); xs.push(x); ys.push(y); }
+  const mx = Math.max(...ys) || 1, Y = y => 92 - y / mx * 80, X = x => x / MAX * 300;
+  const linia = xs.map((x, i) => `${i ? 'L' : 'M'}${X(x).toFixed(1)},${Y(ys[i]).toFixed(1)}`).join('');
+  const my = Y(ys[Math.round(Math.min(MAX, moje) / 5)]), mxX = X(moje);
+  const os = [0, 100, 200, 300, 400, 500, 600, 700].filter(v => v <= MAX && Math.abs(v - moje) > MAX * .09).map(v => `<span style="left:${v / MAX * 100}%">${v}</span>`).join('');
+  return `<div class="wykres-gr"><h4>WYNIKI WSZYSTKICH PILOTÓW (${n})</h4>
+    <div class="w-pl"><svg viewBox="0 0 300 96" preserveAspectRatio="none"><path d="${linia}L300,92L0,92Z" class="w-pole"/><path d="${linia}" class="w-linia"/>
+    <line x1="${mxX}" x2="${mxX}" y1="${my}" y2="92" class="w-ty"/></svg>
+    <i class="w-pin" style="left:${moje / MAX * 100}%;top:${my / 96 * 100}%"></i></div>
+    <div class="w-os">${os}<b style="left:${moje / MAX * 100}%">TY</b></div>
+    <p>Średnio <b>${Math.round(sr)}</b> mil · Ty <b>${moje}</b> mil</p></div>`;
+}
 async function pokazKoniec() {
   tryb = 'koniec'; document.body.classList.remove('w-slepa'); radar = null; wybrany = null; koniecT0 = performance.now() + 300; $('#wynikMapa').hidden = true;
   try { wyniki = await api('/api/wyniki?nr=' + dzien.nr); } catch { wyniki = null; }
@@ -798,7 +816,7 @@ async function pokazKoniec() {
   $('#panel').innerHTML = `<div class="tablica"><div class="nag"><span>PRZYLOTY · ${nrLotu()}${stan.slepa ? ' · 🙈 ŚLEPA MAPA' : ''}</span><span>${new Date(dzien.data + 'T12:00:00').toLocaleDateString('pl-PL')}</span></div>
     ${stan.odp.map((o, i) => `<div class="wiersz" style="--d:${i}"><span>${i + 1}</span><span class="kr"><span class="fl">${o.kraj ? esc(PO_KODZIE[o.kraj].a3) : '⏱'}</span> ${esc(nazwa(o.kraj))}</span><span class="st k${o.poziom}">${o.kraj ? POZ[o.poziom].toUpperCase() : 'CZAS!'}</span><span class="mi">${o.pkt}</span></div>`).join('')}
     <div class="suma"><span class="kolory">${stan.odp.map(o => `<i style="background:${KOL[o.poziom]}"></i>`).join('')}</span><span><b>${suma()}</b> mil</span></div></div>
-    <div class="sekcja">${licznikGraczy(rk)}
+    <div class="sekcja">${licznikGraczy(rk)}${wykresGraczy(suma())}
     <div class="akcje" style="padding:0"><button class="btn glowny" id="bUdostepnij">Udostępnij wynik</button><button class="btn" id="bMenu">Menu</button></div>
     <div class="statyst"><div><b>${s.n}</b>dni z rzędu</div><div><b>${pasz}</b>pieczątek</div><div><b id="odliczanie">–</b>do lotu ${dzis.nr + 1}</div></div></div>
     <div class="sekcja"><h4>ODPOWIEDZI · KLIKNIJ, ŻEBY ZOBACZYĆ NA MAPIE</h4>${stan.odp.map((o, i) => `<div class="odp" data-i="${i}"><div class="q">${i + 1}. ${esc(dzien.pytania[i].q)}</div>
