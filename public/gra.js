@@ -87,7 +87,7 @@ async function wczytajMape() {
   const byC = {};
   for (const f of fc.features) {
     const c = f.id; if (!PO_KODZIE[c]) continue;
-    const g = byC[c] || (byC[c] = { c, path: new Path2D(), bb: [1e9, 1e9, -1e9, -1e9] });
+    const g = byC[c] || (byC[c] = { c, path: new Path2D(), bb: [1e9, 1e9, -1e9, -1e9], pk: [] });
     const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
     for (const poly of polys) {
       // rozwiń długości (antypołudnik), w razie potrzeby narysuj też kopię przesuniętą o 360°
@@ -95,8 +95,9 @@ async function wczytajMape() {
       let mx = -1e9, mn = 1e9; for (const r of rings) for (const [x] of r) { mx = Math.max(mx, x); mn = Math.min(mn, x); }
       const przes = [0]; if (mx > 180) przes.push(-360); if (mn < -180) przes.push(360);
       for (const d of przes) for (const r of rings) {
+        const pts = []; g.pk.push(pts);
         r.forEach(([x, y], i) => {
-          const px = prX(x + d), py = prY(y);
+          const px = prX(x + d), py = prY(y); pts.push(px, py);
           if (i) g.path.lineTo(px, py); else g.path.moveTo(px, py);
           if (x + d >= -180 && x + d <= 180) { g.bb[0] = Math.min(g.bb[0], px); g.bb[1] = Math.min(g.bb[1], py); g.bb[2] = Math.max(g.bb[2], px); g.bb[3] = Math.max(g.bb[3], py); }
         });
@@ -127,6 +128,36 @@ function kolorKraju(g) {
 function lerpKol(a, b, q) { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), f = (s) => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * q); return `rgb(${f(16)},${f(8)},${f(0)})`; }
 function mieszaj(hex, a) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return `rgb(${Math.round(255 - (255 - r) * a)},${Math.round(255 - (255 - g) * a)},${Math.round(255 - (255 - b) * a)})`; }
 
+// uproszczone kontury: przy oddaleniu tysiące punktów wybrzeża wpadają w jeden piksel, a ich rysowanie
+// (zwłaszcza grubych linii płycizn) było główną przyczyną lagów na słabszych komputerach
+function uprosc(a, tol) {
+  const n = a.length / 2; if (n < 5) return a;
+  const keep = new Uint8Array(n), st = [0, n - 1], t2 = tol * tol; keep[0] = keep[n - 1] = 1;
+  while (st.length) {
+    const j = st.pop(), i = st.pop(), ax = a[2 * i], ay = a[2 * i + 1], dx = a[2 * j] - ax, dy = a[2 * j + 1] - ay, L = dx * dx + dy * dy;
+    let mx = -1, mi = -1;
+    for (let m = i + 1; m < j; m++) {
+      const px = a[2 * m] - ax, py = a[2 * m + 1] - ay; let d;
+      if (L) { const u = (px * dx + py * dy) / L; d = u <= 0 ? px * px + py * py : u >= 1 ? (px - dx) ** 2 + (py - dy) ** 2 : (px - u * dx) ** 2 + (py - u * dy) ** 2; } else d = px * px + py * py;
+      if (d > mx) { mx = d; mi = m; }
+    }
+    if (mx > t2) { keep[mi] = 1; st.push(i, mi, mi, j); }
+  }
+  const o = []; for (let m = 0; m < n; m++) if (keep[m]) o.push(a[2 * m], a[2 * m + 1]); return o;
+}
+// ścieżka kraju z dokładnością tolPx pikseli przy skali k (piksele urządzenia na jednostkę mapy); poziomy co 2×, w pamięci
+const TOL0 = 2e-5;
+function sciezka(g, tolPx, k) {
+  const tol = tolPx / k; if (tol < TOL0 * 2) return g.path;
+  const poz = Math.min(14, Math.floor(Math.log2(tol / TOL0))), L = g.lod || (g.lod = []);
+  if (L[poz]) return L[poz];
+  const t = TOL0 * 2 ** poz, p = new Path2D();
+  for (const r of g.pk) {
+    // małe wyspy zostają dokładne (mają mało punktów, a uproszczone robią się trójkątami)
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < r.length; i += 2) { x0 = Math.min(x0, r[i]); x1 = Math.max(x1, r[i]); y0 = Math.min(y0, r[i + 1]); y1 = Math.max(y1, r[i + 1]); }
+    let s = Math.max(x1 - x0, y1 - y0) < t * 12 ? r : uprosc(r, t); if (s.length < 8) s = r; p.moveTo(s[0], s[1]); for (let i = 2; i < s.length; i += 2) p.lineTo(s[i], s[i + 1]); p.closePath(); }
+  return L[poz] = p;
+}
 const kolorBazy = g => PO_KODZIE[g.c].t ? '#e2d3ae' : '#efe2c2';
 // rysuje morze, siatkę, płycizny, cień i kraje; c = kontekst, k/tx/ty = widok, w/h = rozmiar w px CSS, s = skala pikseli
 function rysujMape(c, k, tx, ty, w, h, s, szybko, kolor, kl = k) { // kl: skala, do której dobrane są grubości linii
@@ -141,10 +172,11 @@ function rysujMape(c, k, tx, ty, w, h, s, szybko, kolor, kl = k) { // kl: skala,
   c.setTransform(s * k, 0, 0, s * k, s * tx, s * ty); c.lineJoin = 'round';
   const m = 12 / kl, x0 = -tx / k - m, y0 = -ty / k - m, x1 = (w - tx) / k + m, y1 = (h - ty) / k + m;
   const wid = geo.filter(g => !(g.bb[2] < x0 || g.bb[0] > x1 || g.bb[3] < y0 || g.bb[1] > y1));
-  for (const [lw, kol] of szybko ? [[6, '#bcd3d2']] : [[22, '#7f9fa6'], [20.6, MORZE], [14, '#7f9fa6'], [12.6, MORZE], [6, '#bcd3d2']]) { c.strokeStyle = kol; c.lineWidth = lw / kl; for (const g of wid) c.stroke(g.path); }
-  if (!szybko) { c.save(); c.translate(1.5 / kl, 2.5 / kl); c.fillStyle = '#5a462a40'; for (const g of wid) c.fill(g.path); c.restore(); }
-  for (const g of wid) { c.fillStyle = kolor(g); c.fill(g.path); }
-  c.strokeStyle = '#7a6142'; c.lineWidth = 1 / kl; for (const g of wid) c.stroke(g.path);
+  const P = wid.map(g => sciezka(g, .3, k * s)), Pg = wid.map(g => sciezka(g, 3, k * s)); // płycizny i cień nie potrzebują pełnej dokładności
+  for (const [lw, kol] of szybko ? [[6, '#bcd3d2']] : [[22, '#7f9fa6'], [20.6, MORZE], [14, '#7f9fa6'], [12.6, MORZE], [6, '#bcd3d2']]) { c.strokeStyle = kol; c.lineWidth = lw / kl; for (const p of Pg) c.stroke(p); }
+  if (!szybko) { c.save(); c.translate(1.5 / kl, 2.5 / kl); c.fillStyle = '#5a462a40'; for (const p of Pg) c.fill(p); c.restore(); }
+  wid.forEach((g, i) => { c.fillStyle = kolor(g); c.fill(P[i]); });
+  c.strokeStyle = '#7a6142'; c.lineWidth = 1 / kl; for (const p of P) c.stroke(p);
 }
 // gotowa mapa w pamięci: przy samym przesuwaniu i podświetlaniu nie rysujemy wszystkiego od nowa
 let warstwa = null;
@@ -164,8 +196,10 @@ function zbudujWarstwe(vx0, vy0, vx1, vy1) {
   const m = 14 / V.k, W = [MAPA.x0 - m, MAPA.y0 - m, MAPA.x1 + m, MAPA.y1 + m];
   const skala = (a, b) => Math.min(dpr, MAX_PX / a, MAX_PX / b, Math.sqrt(MAX_POLE / (a * b)));
   let r = W, s = skala((W[2] - W[0]) * V.k, (W[3] - W[1]) * V.k);
-  if (s < dpr * .7 && !(tryb === 'menu' && s >= .45)) {
-    const dx = (vx1 - vx0) * .5, dy = (vy1 - vy0) * .5;
+  // przy zbliżeniu tylko okolica ekranu: cały świat w dużej skali to miliony pikseli do narysowania na raz
+  const duzo = tryb !== 'menu' && (W[2] - W[0]) * (W[3] - W[1]) * V.k * V.k > cw * ch * 2.5;
+  if ((s < dpr * .7 && !(tryb === 'menu' && s >= .45)) || duzo) {
+    const dx = (vx1 - vx0) * (duzo ? .3 : .5), dy = (vy1 - vy0) * (duzo ? .3 : .5);
     r = [Math.max(W[0], vx0 - dx), Math.max(W[1], vy0 - dy), Math.min(W[2], vx1 + dx), Math.min(W[3], vy1 + dy)];
     s = skala((r[2] - r[0]) * V.k, (r[3] - r[1]) * V.k);
   }
@@ -175,7 +209,7 @@ function zbudujWarstwe(vx0, vy0, vx1, vy1) {
   rysujMape(c.getContext('2d'), V.k, -r[0] * V.k, -r[1] * V.k, w, h, s, false, kolorBazy);
   warstwa = { c, k: V.k, s, r, n: geo.length, cw, ch };
 }
-let koszt = LEKKA ? 1e9 : 0; // średni czas ostrego rysowania w ruchu (ms)
+let koszt = LEKKA ? 1e9 : 0, ostroKl = 0; // średni czas klatki przy ostrym rysowaniu w ruchu (ms)
 function rysuj(szybko) {
   const t = performance.now();
   const [vx0, vy0] = naProj(0, 0), [vx1, vy1] = naProj(cw, ch);
@@ -191,10 +225,10 @@ function rysuj(szybko) {
     V.k / warstwa.k < 3 && V.k / warstwa.k > .34 &&
     Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
   // w ruchu: szybkie urządzenia rysują mapę na ostro, wolniejsze przesuwają gotowy obraz
-  const ostro = szybko && !pasuje() && !rozciag && koszt < 9;
+  const ostro = szybko && !pasuje() && !rozciag && koszt < 24; ostroKl = ostro ? t : 0;
   const W = ostro ? null : pasuje() || rozciag ? warstwa : swiatOk || (szybko && swiat && swiat.n === geo.length) ? swiat : null;
   if (W) {
-    if (szybko && koszt < 1e8) koszt *= .98; // co jakiś czas spróbuj znowu na ostro
+    if (szybko && koszt < 1e8) koszt *= .995; // co jakiś czas spróbuj znowu na ostro
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const ox = Math.round((W.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((W.r[1] * V.k + V.ty) * dpr) / dpr, f = V.k / W.k;
     // morze pod spodem tylko wtedy, gdy gotowa mapa nie zakrywa całego ekranu
@@ -207,14 +241,13 @@ function rysuj(szybko) {
     if (dx1 > dx0 && dy1 > dy0) ctx.drawImage(W.c, (dx0 - ox) / q, (dy0 - oy) / q, (dx1 - dx0) / q, (dy1 - dy0) / q, dx0, dy0, dx1 - dx0, dy1 - dy0);
     // kraje w innym kolorze niż na gotowej mapie (najechany, wybrany, odpowiedzi)
     ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
-    for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { ctx.fillStyle = kol; ctx.fill(g.path); ctx.stroke(g.path); } }
+    for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { const p = sciezka(g, .3, V.k * dpr); ctx.fillStyle = kol; ctx.fill(p); ctx.stroke(p); } }
   } else {
-    const a = performance.now(); rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, ostro ? false : szybko, kolorKraju);
-    if (ostro) { const d = performance.now() - a; koszt = koszt ? koszt * .7 + d * .3 : d; }
+    rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, ostro ? false : szybko, kolorKraju);
   }
   ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round';
   // obrys wybranego / najechanego
-  const obrys = (c, kol, w) => { const g = geo.find(g => g.c === c); if (g) { ctx.strokeStyle = kol; ctx.lineWidth = w / V.k; ctx.stroke(g.path); } };
+  const obrys = (c, kol, w) => { const g = geo.find(g => g.c === c); if (g) { ctx.strokeStyle = kol; ctx.lineWidth = w / V.k; ctx.stroke(sciezka(g, .3, V.k * dpr)); } };
   if (najechany && najechany !== wybrany && !PO_KODZIE[najechany].t) obrys(najechany, '#a8742a', 1.8);
   if (wybrany) obrys(wybrany, '#8a3b1c', 2.4);
   if (tryb === 'wynik' && stan.odp.length && stan.odp[stan.odp.length - 1].kraj) { const o = stan.odp[stan.odp.length - 1]; ctx.globalAlpha = .35; obrys(o.kraj, KOL[o.poziom], 9); ctx.globalAlpha = 1; obrys(o.kraj, KOL[o.poziom], 2.6); }
@@ -348,7 +381,10 @@ let ostatniaKl = 0;
 function petla(t) {
   requestAnimationFrame(petla);
   // najwyżej ok. 60 klatek (monitory 144 Hz), w menu ok. 30
-  if (t - ostatniaKl < (tryb === 'menu' ? 30 : 14)) return; ostatniaKl = t;
+  if (t - ostatniaKl < (tryb === 'menu' ? 30 : 14)) return;
+  // przeglądarka rysuje ścieżki dopiero przy wyświetleniu klatki, więc koszt ostrego rysowania widać w odstępie do następnej
+  if (ostroKl) { const d = Math.min(500, t - ostatniaKl); koszt = koszt ? koszt * .6 + d * .4 : d; ostroKl = 0; }
+  ostatniaKl = t;
   if (ruchMyszy) { const m = ruchMyszy; ruchMyszy = null; najedz(m.x, m.y); }
   krokMenu(t); krokKamery(t); const szb = !!kamera || t < ruchDo;
   if (bylSzybki && !szb) brudne = true; bylSzybki = szb;
