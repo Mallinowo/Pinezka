@@ -37,14 +37,8 @@ main{display:flex;gap:14px;height:calc(100% - 56px);padding:0 14px 14px}
 .zoom button{width:36px;height:36px;background:none;border:0;border-bottom:1px solid var(--linia);color:var(--tusz);font-size:18px}
 .zoom button:last-child{border:0;font-size:15px}
 .zoom button:hover{background:#fff6e0}
-.chmury,.winieta{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.winieta{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
 .winieta{background:radial-gradient(ellipse at center,#0000 55%,#5a3a1a40 100%)}
-.chmury i{position:absolute;width:260px;height:90px;border-radius:50%;background:radial-gradient(ellipse at center,#fffaf0aa 0%,#fffaf044 45%,#fff0 70%);filter:blur(6px);animation:chm 90s linear infinite;will-change:transform;left:-300px}
-.chmury i:nth-child(1){top:12%;animation-duration:110s;animation-delay:-20s}
-.chmury i:nth-child(2){top:38%;width:340px;height:110px;animation-duration:140s;animation-delay:-80s;opacity:.6}
-.chmury i:nth-child(3){top:63%;animation-duration:120s;animation-delay:-50s}
-.chmury i:nth-child(4){top:80%;width:200px;animation-duration:95s;animation-delay:-5s;opacity:.5}
-.chmury i:nth-child(5){top:25%;width:180px;height:60px;animation-duration:160s;animation-delay:-120s}
 @keyframes chm{to{transform:translateX(calc(100vw + 600px))}}
 .kompas{position:absolute;right:16px;bottom:16px;width:86px;height:86px;z-index:3;pointer-events:none;filter:drop-shadow(1px 2px 0 #3b2a1a44)}
 #panel{width:390px;flex:none;overflow:auto;padding:0 2px 10px}
@@ -423,7 +417,6 @@ body.w-slepa .szukaj{display:none}
 .slepa-tog .tx b{color:var(--czerw)}
 .slepa-tog .tx small{display:block;font-size:9px;color:var(--szary);letter-spacing:.04em}
 .slepa-tog.zab{cursor:default;opacity:.75}
-body.lekka .chmury{display:none}
 
 /* licznik graczy na koniec lotu */
 .licznik-gr{display:flex;align-items:center;gap:12px;margin:0 0 12px;padding:10px 14px;border:1.5px dashed #b9a57f;border-radius:4px;background:#f6edd6;font-size:14px;line-height:1.35;animation:licznikWjazd .5s .3s both}
