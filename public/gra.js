@@ -37,9 +37,6 @@ const V = { k: 100, tx: 0, ty: 0 }; // ekran = proj * k + t
 let geo = []; // {c, path, bb:[x0,y0,x1,y1]}
 let brudne = true, wynikT0 = 0, koniecT0 = 0;
 const MORZE = '#a9c4c8';
-const fale = (() => { const c = document.createElement('canvas'); c.width = 64; c.height = 48; const x = c.getContext('2d');
-  for (let i = 0; i < 70; i++) { x.fillStyle = Math.random() < .5 ? '#ffffff26' : '#3d6a7414'; x.fillRect(Math.random() * 64, Math.random() * 48, 1.2, 1.2); }
-  return ctx.createPattern(c, 'repeat'); })();
 
 // bez sprzętowej grafiki (np. wyłączona akceleracja w przeglądarce) wszystko liczy procesor: lżejszy tryb
 const LEKKA = (() => { try { const g = document.createElement('canvas').getContext('webgl'); if (!g) return true; const x = g.getExtension('WEBGL_debug_renderer_info');
@@ -47,7 +44,7 @@ const LEKKA = (() => { try { const g = document.createElement('canvas').getConte
 if (LEKKA) document.body.classList.add('lekka');
 function rozmiar() {
   const r = cv.getBoundingClientRect(); cw = r.width; ch = r.height; dpr = Math.min(LEKKA ? 1 : 2, window.devicePixelRatio || 1);
-  cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); swiat = null; ogranicz(); brudne = true;
+  cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); ogranicz(); brudne = true;
 }
 const kFit = () => Math.min(cw / (MAPA.x1 - MAPA.x0), ch / (MAPA.y1 - MAPA.y0));
 function ogranicz() {
@@ -128,56 +125,9 @@ function kolorKraju(g) {
 function lerpKol(a, b, q) { const A = parseInt(a.slice(1), 16), B = parseInt(b.slice(1), 16), f = (s) => Math.round(((A >> s) & 255) + (((B >> s) & 255) - ((A >> s) & 255)) * q); return `rgb(${f(16)},${f(8)},${f(0)})`; }
 function mieszaj(hex, a) { const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255; return `rgb(${Math.round(255 - (255 - r) * a)},${Math.round(255 - (255 - g) * a)},${Math.round(255 - (255 - b) * a)})`; }
 
-// uproszczone kontury: przy oddaleniu tysiące punktów wybrzeża wpadają w jeden piksel, a ich rysowanie
-// (zwłaszcza grubych linii płycizn) było główną przyczyną lagów na słabszych komputerach
-function uprosc(a, tol) {
-  const n = a.length / 2; if (n < 5) return a;
-  const keep = new Uint8Array(n), st = [0, n - 1], t2 = tol * tol; keep[0] = keep[n - 1] = 1;
-  while (st.length) {
-    const j = st.pop(), i = st.pop(), ax = a[2 * i], ay = a[2 * i + 1], dx = a[2 * j] - ax, dy = a[2 * j + 1] - ay, L = dx * dx + dy * dy;
-    let mx = -1, mi = -1;
-    for (let m = i + 1; m < j; m++) {
-      const px = a[2 * m] - ax, py = a[2 * m + 1] - ay; let d;
-      if (L) { const u = (px * dx + py * dy) / L; d = u <= 0 ? px * px + py * py : u >= 1 ? (px - dx) ** 2 + (py - dy) ** 2 : (px - u * dx) ** 2 + (py - u * dy) ** 2; } else d = px * px + py * py;
-      if (d > mx) { mx = d; mi = m; }
-    }
-    if (mx > t2) { keep[mi] = 1; st.push(i, mi, mi, j); }
-  }
-  const o = []; for (let m = 0; m < n; m++) if (keep[m]) o.push(a[2 * m], a[2 * m + 1]); return o;
-}
-// ścieżka kraju z dokładnością tolPx pikseli przy skali k (piksele urządzenia na jednostkę mapy); poziomy co 2×, w pamięci
-const TOL0 = 2e-5;
-function sciezka(g, tolPx, k) {
-  const tol = tolPx / k; if (tol < TOL0 * 2) return g.path;
-  const poz = Math.min(14, Math.floor(Math.log2(tol / TOL0))), L = g.lod || (g.lod = []);
-  if (L[poz]) return L[poz];
-  const t = TOL0 * 2 ** poz, p = new Path2D();
-  for (const r of g.pk) {
-    // małe wyspy zostają dokładne (mają mało punktów, a uproszczone robią się trójkątami)
-    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < r.length; i += 2) { x0 = Math.min(x0, r[i]); x1 = Math.max(x1, r[i]); y0 = Math.min(y0, r[i + 1]); y1 = Math.max(y1, r[i + 1]); }
-    let s = Math.max(x1 - x0, y1 - y0) < t * 12 ? r : uprosc(r, t); if (s.length < 8) s = r; p.moveTo(s[0], s[1]); for (let i = 2; i < s.length; i += 2) p.lineTo(s[i], s[i + 1]); p.closePath(); }
-  return L[poz] = p;
-}
+const { sciezka, rysujMape: rysujPodklad } = window.PZRYS;
+const rysujMape = (c, ...a) => rysujPodklad(c, geo, ...a);
 const kolorBazy = g => PO_KODZIE[g.c].t ? '#e2d3ae' : '#efe2c2';
-// rysuje morze, siatkę, płycizny, cień i kraje; c = kontekst, k/tx/ty = widok, w/h = rozmiar w px CSS, s = skala pikseli
-function rysujMape(c, k, tx, ty, w, h, s, szybko, kolor, kl = k) { // kl: skala, do której dobrane są grubości linii
-  const ek = (lon, lat) => [prX(lon) * k + tx, prY(lat) * k + ty];
-  c.setTransform(s, 0, 0, s, 0, 0);
-  c.fillStyle = MORZE; c.fillRect(0, 0, w, h);
-  if (fale) { c.save(); c.translate(tx % 64, ty % 48); c.fillStyle = fale; c.fillRect(-64, -48, w + 128, h + 96); c.restore(); }
-  c.strokeStyle = '#5f859066'; c.lineWidth = .8; c.setLineDash([4, 4]); c.beginPath();
-  for (let lon = -180; lon <= 180; lon += 30) { const [x] = ek(lon, 0); c.moveTo(x, ek(0, 84)[1]); c.lineTo(x, ek(0, -57)[1]); }
-  for (let lat = -45; lat <= 75; lat += 15) { const [, y] = ek(0, lat); c.moveTo(ek(-180, 0)[0], y); c.lineTo(ek(180, 0)[0], y); }
-  c.stroke(); c.setLineDash([]);
-  c.setTransform(s * k, 0, 0, s * k, s * tx, s * ty); c.lineJoin = 'round';
-  const m = 12 / kl, x0 = -tx / k - m, y0 = -ty / k - m, x1 = (w - tx) / k + m, y1 = (h - ty) / k + m;
-  const wid = geo.filter(g => !(g.bb[2] < x0 || g.bb[0] > x1 || g.bb[3] < y0 || g.bb[1] > y1));
-  const P = wid.map(g => sciezka(g, .3, k * s)), Pg = wid.map(g => sciezka(g, 3, k * s)); // płycizny i cień nie potrzebują pełnej dokładności
-  for (const [lw, kol] of szybko ? [[6, '#bcd3d2']] : [[22, '#7f9fa6'], [20.6, MORZE], [14, '#7f9fa6'], [12.6, MORZE], [6, '#bcd3d2']]) { c.strokeStyle = kol; c.lineWidth = lw / kl; for (const p of Pg) c.stroke(p); }
-  if (!szybko) { c.save(); c.translate(1.5 / kl, 2.5 / kl); c.fillStyle = '#5a462a40'; for (const p of Pg) c.fill(p); c.restore(); }
-  wid.forEach((g, i) => { c.fillStyle = kolor(g); c.fill(P[i]); });
-  c.strokeStyle = '#7a6142'; c.lineWidth = 1 / kl; for (const p of P) c.stroke(p);
-}
 // gotowa mapa w pamięci: przy samym przesuwaniu i podświetlaniu nie rysujemy wszystkiego od nowa
 let warstwa = null;
 const MAX_PX = 8192, MAX_POLE = 16e6;
@@ -188,9 +138,36 @@ function zbudujSwiat() {
   const W0 = MAPA.x1 - MAPA.x0, H0 = MAPA.y1 - MAPA.y0, kDom = cw < 600 ? ch / H0 * 1.15 : kFit();
   const k = Math.min(kDom * dpr / .87, 4096 / W0, Math.sqrt(12e6 / (W0 * H0))), m = 14 / k;
   const r = [MAPA.x0 - m, MAPA.y0 - m, MAPA.x1 + m, MAPA.y1 + m], w = (r[2] - r[0]) * k, h = (r[3] - r[1]) * k;
+  const z = { k, s: 1, r, n: geo.length, dpr, cw, ch };
+  if (zlec(z, Math.round(w), Math.round(h), k, -r[0] * k, -r[1] * k, w, h, 1, k * .87 / dpr, c => swiat = { c, ...z })) { swiatZl = z; return; }
   const c = document.createElement('canvas'); c.width = Math.round(w); c.height = Math.round(h);
   rysujMape(c.getContext('2d'), k, -r[0] * k, -r[1] * k, w, h, 1, false, kolorBazy, k * .87 / dpr);
-  swiat = { c, k, s: 1, r, n: geo.length, dpr };
+  swiat = { c, ...z };
+}
+// rysowanie w tle (Worker + OffscreenCanvas); bez tego, np. w starszych przeglądarkach, rysujemy od razu na stronie
+let robot = null, nrZl = 0, swiatZl = null, warstwaZl = null;
+const czekaja = {};
+try {
+  if (typeof OffscreenCanvas !== 'undefined' && window.createImageBitmap && new OffscreenCanvas(1, 1).getContext('2d')) {
+    robot = new Worker('/mapa-rys.js');
+    robot.onerror = () => { robot = null; swiatZl = warstwaZl = null; brudne = true; };
+    robot.onmessage = e => {
+      const { id, bmp } = e.data, f = czekaja[id]; delete czekaja[id];
+      if (!f) { bmp.close(); return; }
+      const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+      const x = c.getContext('bitmaprenderer'); if (x) x.transferFromImageBitmap(bmp); else { c.getContext('2d').drawImage(bmp, 0, 0); bmp.close(); }
+      f(c); brudne = true;
+    };
+  }
+} catch (e) { robot = null; }
+let geoWyslane = 0;
+function zlec(z, W, H, k, tx, ty, w, h, s, kl, gotowe) {
+  if (!robot) return false;
+  if (geoWyslane !== geo.length) { robot.postMessage({ typ: 'geo', geo: geo.map(g => ({ c: g.c, pk: g.pk, bb: g.bb, t: !!PO_KODZIE[g.c].t })) }); geoWyslane = geo.length; }
+  const id = ++nrZl; z.id = id;
+  czekaja[id] = c => { if (z === swiatZl) swiatZl = null; if (z === warstwaZl) warstwaZl = null; gotowe(c); };
+  robot.postMessage({ typ: 'rys', id, W: Math.max(1, W), H: Math.max(1, H), k, tx, ty, w, h, s, kl });
+  return true;
 }
 function zbudujWarstwe(vx0, vy0, vx1, vy1) {
   const m = 14 / V.k, W = [MAPA.x0 - m, MAPA.y0 - m, MAPA.x1 + m, MAPA.y1 + m];
@@ -204,12 +181,25 @@ function zbudujWarstwe(vx0, vy0, vx1, vy1) {
     s = skala((r[2] - r[0]) * V.k, (r[3] - r[1]) * V.k);
   }
   const w = (r[2] - r[0]) * V.k, h = (r[3] - r[1]) * V.k;
+  const z = { k: V.k, s, r, n: geo.length, cw, ch };
+  if (warstwaZl && warstwaZl.k === V.k && warstwaZl.cw === cw && warstwaZl.ch === ch) return; // już się rysuje
+  if (warstwaZl) delete czekaja[warstwaZl.id]; // starsze zlecenie jest już niepotrzebne
+  if (zlec(z, Math.round(w * s), Math.round(h * s), V.k, -r[0] * V.k, -r[1] * V.k, w, h, s, V.k, c => warstwa = { c, ...z })) { warstwaZl = z; return; }
   const c = (warstwa && warstwa.c) || document.createElement('canvas');
   c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
   rysujMape(c.getContext('2d'), V.k, -r[0] * V.k, -r[1] * V.k, w, h, s, false, kolorBazy);
   warstwa = { c, k: V.k, s, r, n: geo.length, cw, ch };
 }
-let koszt = LEKKA ? 1e9 : 0, ostroKl = 0; // średni czas klatki przy ostrym rysowaniu w ruchu (ms)
+let koszt = LEKKA ? 1e9 : 0, ostroKl = 0, ostatniaBud = 0; // czas klatki z rysowaniem mapy w ruchu (ms)
+// dwa obrazy mapy pod płótnem: cały świat (zawsze) i ostra okolica ekranu
+const mapaSwiat = { el: null, przed: () => cv.parentNode.firstChild }, mapaWarstwa = { el: null, przed: () => cv };
+function pokaz(W, m) {
+  if (!W) { if (m.el) m.el.style.visibility = 'hidden'; return; }
+  if (m.el !== W.c) { if (m.el) m.el.remove(); m.el = W.c; W.c.className = 'mapa-obraz'; cv.parentNode.insertBefore(W.c, m.przed()); }
+  const st = W.c.style, f = V.k / W.k, ox = Math.round((W.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((W.r[1] * V.k + V.ty) * dpr) / dpr; // całe piksele, inaczej obraz się rozmywa
+  const sz = W.c.width / W.s + 'px', wy = W.c.height / W.s + 'px'; if (st.width !== sz) st.width = sz; if (st.height !== wy) st.height = wy;
+  st.transform = `translate3d(${ox.toFixed(2)}px,${oy.toFixed(2)}px,0) scale(${f.toFixed(5)})`; st.visibility = '';
+}
 function rysuj(szybko) {
   const t = performance.now();
   const [vx0, vy0] = naProj(0, 0), [vx1, vy1] = naProj(cw, ch);
@@ -217,34 +207,23 @@ function rysuj(szybko) {
   const pasuje = () => warstwa && warstwa.k === V.k && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
     Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
   // cały świat w średniej rozdzielczości: wystarcza przy zwykłym widoku i jest zapasem na animacje kamery
-  if (!swiat && geo.length) zbudujSwiat();
+  if (geo.length && !swiatZl && (!swiat || swiat.dpr !== dpr || swiat.cw !== cw || swiat.ch !== ch || swiat.n !== geo.length)) zbudujSwiat();
   const ile = swiat ? V.k * dpr / swiat.k : 0, swiatOk = swiat && swiat.n === geo.length && swiat.dpr === dpr && ile <= 1.05 && ile >= .7;
   if (!pasuje() && !szybko && !swiatOk && geo.length) zbudujWarstwe(vx0, vy0, vx1, vy1);
-  // w trakcie zoomu: rozciągnięta gotowa mapa (chwilę mniej ostra), ostra wraca, gdy ruch się skończy
-  const rozciag = szybko && !pasuje() && warstwa && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch &&
-    V.k / warstwa.k < 3 && V.k / warstwa.k > .34 &&
-    Math.max(vx0, MAPA.x0) >= warstwa.r[0] && Math.max(vy0, MAPA.y0) >= warstwa.r[1] && Math.min(vx1, MAPA.x1) <= warstwa.r[2] && Math.min(vy1, MAPA.y1) <= warstwa.r[3];
-  // w ruchu: szybkie urządzenia rysują mapę na ostro, wolniejsze przesuwają gotowy obraz
-  const ostro = szybko && !pasuje() && !rozciag && koszt < 24; ostroKl = ostro ? t : 0;
-  const W = ostro ? null : pasuje() || rozciag ? warstwa : swiatOk || (szybko && swiat && swiat.n === geo.length) ? swiat : null;
-  if (W) {
-    if (szybko && koszt < 1e8) koszt *= .995; // co jakiś czas spróbuj znowu na ostro
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const ox = Math.round((W.r[0] * V.k + V.tx) * dpr) / dpr, oy = Math.round((W.r[1] * V.k + V.ty) * dpr) / dpr, f = V.k / W.k;
-    // morze pod spodem tylko wtedy, gdy gotowa mapa nie zakrywa całego ekranu
-    if (ox > 0 || oy > 0 || ox + W.c.width / W.s * f < cw || oy + W.c.height / W.s * f < ch) {
-      ctx.fillStyle = MORZE; ctx.fillRect(0, 0, cw, ch);
-      if (fale) { ctx.save(); ctx.translate(V.tx % 64, V.ty % 48); ctx.fillStyle = fale; ctx.fillRect(-64, -48, cw + 128, ch + 96); ctx.restore(); }
-    }
-    // tylko widoczny wycinek (przy dużym zoomie reszta obrazu i tak jest poza ekranem)
-    const q = f / W.s, dx0 = Math.max(0, ox), dy0 = Math.max(0, oy), dx1 = Math.min(cw, ox + W.c.width * q), dy1 = Math.min(ch, oy + W.c.height * q);
-    if (dx1 > dx0 && dy1 > dy0) ctx.drawImage(W.c, (dx0 - ox) / q, (dy0 - oy) / q, (dx1 - dx0) / q, (dy1 - dy0) / q, dx0, dy0, dx1 - dx0, dy1 - dy0);
-    // kraje w innym kolorze niż na gotowej mapie (najechany, wybrany, odpowiedzi)
-    ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
-    for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { const p = sciezka(g, .3, V.k * dpr); ctx.fillStyle = kol; ctx.fill(p); ctx.stroke(p); } }
-  } else {
-    rysujMape(ctx, V.k, V.tx, V.ty, cw, ch, dpr, ostro ? false : szybko, kolorKraju);
+  const wOk = () => warstwa && warstwa.n === geo.length && warstwa.cw === cw && warstwa.ch === ch;
+  // w długim locie kamery szybkie urządzenia dorysowują ostrą mapę po drodze, wolniejsze tylko przesuwają gotowy obraz
+  if (szybko && geo.length && (robot || koszt < 30) && !warstwaZl && !pasuje() && t - ostatniaBud > 250) {
+    const f = wOk() ? V.k / warstwa.k : 0;
+    if (wOk() ? f > 1.6 || f < .6 : ile > 1.4) { zbudujWarstwe(vx0, vy0, vx1, vy1); ostatniaBud = t; if (!robot) ostroKl = t; }
   }
+  // mapa to gotowe obrazy przesuwane i skalowane przez kartę graficzną (CSS), a płótno na wierzchu ma tylko to, co się zmienia
+  pokaz(swiat && swiat.n === geo.length && !pasuje() ? swiat : null, mapaSwiat);
+  const fw = wOk() ? V.k / warstwa.k : 0;
+  pokaz(pasuje() || ((szybko || !swiatOk) && fw < 4 && fw > .25) ? warstwa : null, mapaWarstwa);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+  // kraje w innym kolorze niż na gotowej mapie (najechany, wybrany, odpowiedzi)
+  ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round'; ctx.strokeStyle = '#7a6142'; ctx.lineWidth = 1 / V.k;
+  for (const g of geo) if (!g.ukryty) { const kol = kolorKraju(g); if (kol !== kolorBazy(g)) { const p = sciezka(g, .3, V.k * dpr); ctx.fillStyle = kol; ctx.fill(p); ctx.stroke(p); } }
   ctx.setTransform(dpr * V.k, 0, 0, dpr * V.k, dpr * V.tx, dpr * V.ty); ctx.lineJoin = 'round';
   // obrys wybranego / najechanego
   const obrys = (c, kol, w) => { const g = geo.find(g => g.c === c); if (g) { ctx.strokeStyle = kol; ctx.lineWidth = w / V.k; ctx.stroke(sciezka(g, .3, V.k * dpr)); } };

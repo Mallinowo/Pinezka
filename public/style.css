@@ -27,7 +27,8 @@ nav button.wyl{opacity:.45}
 main{display:flex;gap:14px;height:calc(100% - 56px);padding:0 14px 14px}
 #mapa{position:relative;flex:1;min-width:0;overflow:hidden;touch-action:none;background:#a9c4c8;border:10px solid var(--papier);outline:1px solid var(--tusz2);outline-offset:-14px;box-shadow:0 10px 30px #0008,inset 0 0 0 1px #0002}
 #mapa::before{content:"";position:absolute;inset:0;background:var(--szum);opacity:.7;pointer-events:none;z-index:1}
-#cv{display:block;width:100%;height:100%;cursor:crosshair}
+#cv{display:block;position:relative;width:100%;height:100%;cursor:crosshair}
+.mapa-obraz{position:absolute;left:0;top:0;transform-origin:0 0;pointer-events:none;will-change:transform}
 #dymek{position:absolute;pointer-events:none;background:var(--papier);color:var(--tusz);border:1px solid var(--tusz2);padding:4px 9px;font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;z-index:4;transform:translate(14px,-34px);box-shadow:2px 3px 0 #3b2a1a33}
 .szukaj{position:absolute;left:14px;top:14px;z-index:3}
 .szukaj input{width:220px;background:var(--papier);border:1px solid var(--tusz2);border-radius:2px;color:var(--tusz);padding:9px 11px;font-family:var(--mono);font-size:13px;box-shadow:2px 3px 0 #3b2a1a33}
